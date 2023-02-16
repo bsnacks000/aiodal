@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "aiodal"
+version = "0.1.0"
+description = "async sqla data access layer and related tools"
+authors = ["bsnacks000 <bsnacks000@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.9"
+SQLAlchemy = ">=1.4,<3.0"
+alembic = "^1.9.3"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.2.1"
+anyio = "^3.6.2"
+pytest-cov = "^4.0.0"
+mypy = "^1.0.0"
+asyncpg = "^0.27.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.plugins.pytest11]
+aiodal_plugin = "aiodal.pytest_plugin"

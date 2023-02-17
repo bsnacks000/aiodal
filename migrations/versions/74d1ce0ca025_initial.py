@@ -8,6 +8,7 @@ Create Date: 2023-02-15 08:31:37.385944
 from alembic import op
 import sqlalchemy as sa
 
+from sqlalchemy.dialects.postgresql import JSONB
 
 # revision identifiers, used by Alembic.
 revision = '74d1ce0ca025'
@@ -15,7 +16,7 @@ down_revision = None
 branch_labels = None
 depends_on = None
 
-
+# classic rel db example nonsense... this is for basic testing
 def upgrade() -> None:
     op.create_table('author', 
         sa.Column('id', sa.Integer, primary_key=True, autoincrement=True),
@@ -26,6 +27,7 @@ def upgrade() -> None:
         sa.Column('author_id',sa.Integer,  sa.ForeignKey('author.id',ondelete='CASCADE'), nullable=False),
         sa.Column('name', sa.String(64)), 
         sa.Column('catalog', sa.String(64)),
+        sa.Column('extra', JSONB, server_default="{}"),
         sa.UniqueConstraint('catalog', name='uc__book'))
 
 

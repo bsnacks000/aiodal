@@ -2,7 +2,7 @@
 --- 
 A small toolset for working with sqlalchemy core using the reflection API and asyncio extension. 
 
-Supports sqlalchemy 1.4+ and 
+Supports sqlalchemy 1.4+ and 2.x, alembic 1.x and asyncpg.  
 
 ## about
 ---- 
@@ -20,11 +20,18 @@ This little API is the backbone of most of our database and rest API projects.
 
 The `DataAccessLayer` class is the centerpiece and acts as a controller and proxy. It is borrowed from an old book on sqlalchemy back from before the ORM was even a thing by Rick Copeland. You call `await reflect` by passing in an engine and the dal will keep an instance of MetaData populated for the duration of your app. We also include automatically include views and allow for convenient lookup of unique constraints.  
 
-A `TransactionManager` is created via an async `contextmanager` by passing in a connection and a reference to the dal instance. This wraps some of the basic patterns found in the documentation sqlalchmey 1.4+. We yield this transaction and do our work. It will automatically commit or rollback on error. This is a pretty standard pattern we've written a million times. 
+A `TransactionManager` is created via an async `contextmanager` by passing in a connection and a reference to the dal instance. This wraps some of the basic patterns found in the documentation for sqlalchmey 1.4+. We yield this transaction and do our work. It will automatically commit or rollback on error. This is a pretty standard pattern we've written a million times. 
 
 I've included a json encoder that we use that will handle enums and datetimes.  
 
-There is also a module for pytest that spins up and tears down a test database and calls into alembic to run the updated migrations and provides some wrapper fixtures. 
+Most useful is the pytest plugin. This will allow a number of fixtures to be made available to you and handles running migrations via alembic. This is in the style of django where a test database will be spun up and torn down. It works by pointing it to an alembic.ini file which can be set in pytests ini config (default is to use alembic.ini at project root). There are several session scoped fixtures that essentially let you turn this behavior on and off if you need to work with a persistent test database and manage data migrations without alembic. 
 
-Future work might include building some mixins for use with pydantic to provide interfaces for basic CRUD ops. I think pydantic makes an excellent substitute for an ORM in many cases. When our codebase at work successfully moves to sqla 2.0 we will bump the version here. 
+A transaction fixture is provided that will automatically rollback tests as well as entrypoints to swap out the `json_encoder`. Again this all follows basic patterns found in numerous libraries. 
 
+Note that we are using anyio for testing and automatically configure the event loop at session scope to use `asyncio`. This can be modified but should remain at session scope to avoid issues with the event loop.
+
+## future work
+
+Future work will include building a `mixins.py` that would provide interfaces for basic CRUD ops and filtering that could be used with any object. Still spec'ing this out but the goal would be to allow the API to be mixed in to a library like pydantic without tightly coupling it. 
+
+Also I might add some functionality for postgres specific sqlalchemy API like `on_conflict_do_update` for upsert which is extremely useful.

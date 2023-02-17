@@ -50,12 +50,6 @@ async def run_migrations(engine: AsyncEngine, alembic_cfg: AlembicConfig):
         await conn.run_sync(do_run_migrations, alembic_cfg)
 
 
-@pytest.fixture(scope='session')
-def anyio_backend():
-    """ Override this to use a different backend for testing 
-    """
-    return 'asyncio'
-
 
 @pytest.fixture(scope='session')
 def testdb_name():

@@ -1,11 +1,5 @@
 test:
-	docker-compose run --rm -e ENVIRONMENT=testing app poetry run pytest -v --cov=aiodal/ --cov-report=term-missing
-
-test-marker:
-	docker-compose run --rm -e ENVIRONMENT=testing app poetry run pytest -v -s -m $(marker) --cov=aiodal/ --cov-report=term-missing
-
-test-single-module:
-	docker-compose run --rm -e ENVIRONMENT=testing app poetry run pytest --cov=bemadb/ --cov-report=term-missing $(module) -v -s
+	docker-compose -f testing.yaml run --rm -e ENVIRONMENT=testing app 
 
 upgrade-head:
 	docker-compose run --rm app alembic upgrade head 

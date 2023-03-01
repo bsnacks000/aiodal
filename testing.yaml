@@ -1,4 +1,4 @@
-version: '3.4'
+version: "3.4"
 
 services:
   tsdb:
@@ -15,7 +15,7 @@ services:
     expose:
       - "5432"
     ports:
-      - "5454:5432" # for debugging 
+      - "5454:5432" # for debugging
     shm_size: 1g
 
   app:
@@ -25,11 +25,18 @@ services:
     build: .
     volumes:
       - .:/app
-    command: sh -c "echo "starting" && tail -f /dev/null"
+    command:
+      - /bin/sh
+      - -c
+      - |
+        PGPASSWORD=${POSTGRES_PASSWORD} dropdb -h tsdb -p 5432 -U ${POSTGRES_USER} -e -f --if-exists testdb && \
+        PGPASSWORD=${POSTGRES_PASSWORD} createdb -h tsdb -p 5432 -U ${POSTGRES_USER} -e testdb
+        poetry run alembic upgrade head
+        poetry run pytest -s -v --cov=aiodal/ --cov-report=term-missing
+        poetry run mypy aiodal --strict
+        PGPASSWORD=${POSTGRES_PASSWORD} dropdb -h tsdb -p 5432 -U ${POSTGRES_USER} -e -f --if-exists testdb
     depends_on:
       - tsdb
 
 volumes:
   pgdata:
-
-

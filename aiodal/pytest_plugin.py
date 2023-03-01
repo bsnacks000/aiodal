@@ -1,176 +1,185 @@
-import pytest
-
-from typing import Optional, Tuple, Callable
-from alembic import command
-from alembic.config import Config as AlembicConfig
+from typing import Callable, Any, AsyncIterator
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine
 from .dal import DataAccessLayer, TransactionManager
-from . import helpers 
+from . import helpers
 from .database import create_database, drop_database
 
+import pytest
+
 import pathlib
-import logging 
+import logging
 import secrets
-import anyio
 
 logger = logging.getLogger(__name__)
 
+from alembic.config import Config as AlembicConfig
 from alembic.runtime.environment import EnvironmentContext
 from alembic.script import ScriptDirectory
 
-# 1. the location of alembic.ini to run the migrations 
-# 2. 
 
-import dataclasses 
-
+import dataclasses
 
 
 def do_run_migrations(connection: sa.Connection, cfg: AlembicConfig) -> None:
     script = ScriptDirectory.from_config(cfg)
 
-    def upgrade(rev, context):
-        return script._upgrade_revs('head', rev)
-    
-    context = EnvironmentContext(cfg, 
-                                 script,
-                                 fn=upgrade,
-                                 as_sql=False,
-                                 starting_rev=None,
-                                 destination_rev='head')
-    
-    context.configure(connection, )
+    def upgrade(rev, context):  # type: ignore
+        return script._upgrade_revs("head", rev)
+
+    context = EnvironmentContext(
+        cfg, script, fn=upgrade, as_sql=False, starting_rev=None, destination_rev="head"
+    )
+
+    context.configure(
+        connection,
+    )
 
     with context.begin_transaction():
         context.run_migrations()
 
-async def run_migrations(engine: AsyncEngine, alembic_cfg: AlembicConfig): 
 
-    async with engine.connect() as conn: 
+async def run_migrations(engine: AsyncEngine, alembic_cfg: AlembicConfig) -> None:
+    async with engine.connect() as conn:
         await conn.run_sync(do_run_migrations, alembic_cfg)
 
 
-
-@pytest.fixture(scope='session')
-def testdb_name():
-    """ Override this if you want to provide a specific name  
-    """ 
-    return 'test_' + str(secrets.token_hex(4))
+@pytest.fixture(scope="session")
+def testdb_name() -> str:
+    """Override this if you want to provide a specific name"""
+    return "test_" + str(secrets.token_hex(4))
 
 
-@pytest.fixture(scope='session')
-def json_serializer():
-    """ Override this to change what function you want to use for json_serializer  
-    """ 
+JsonSerializerT = Callable[[Any], str]
+
+
+@pytest.fixture(scope="session")
+def json_serializer() -> JsonSerializerT:
+    """Override this to change what function you want to use for json_serializer"""
     return helpers.json_serializer
 
-@pytest.fixture(scope='session')
-def call_create_destroy(): 
-    """ Override this change whether we call create or destroy database 
-    """
+
+@pytest.fixture(scope="session")
+def call_create_destroy() -> bool:
+    """Override this change whether we call create or destroy database"""
     return True
 
 
-@pytest.fixture(scope='session')
-def call_create_destroy_database(): 
-    """ Override this change whether we call create or destroy database 
-    """
+@pytest.fixture(scope="session")
+def call_create_destroy_database() -> bool:
+    """Override this change whether we call create or destroy database"""
     return True
 
 
-@pytest.fixture(scope='session')
-def call_run_migrations(): 
-    """ Override this change whether we call create or destroy database 
-    """
+@pytest.fixture(scope="session")
+def call_run_migrations() -> bool:
+    """Override this change whether we call create or destroy database"""
     return True
 
 
 @dataclasses.dataclass
-class TestConfig: 
-    engine: AsyncEngine 
+class TestConfig:
+    engine: AsyncEngine
     alembic_cfg: AlembicConfig
     call_create_destroy: bool
     call_run_migrations: bool
 
 
-@pytest.fixture(scope='session')
-def aiodal_test_config(
-    pytestconfig: pytest.Config, 
-    testdb_name: str, 
-    json_serializer: Callable[[], str], 
-    call_create_destroy: bool, 
-    call_run_migrations: bool) -> TestConfig: 
-    
-    """ Override this to change how you want your engine to setup for the duration of the session 
-    """
-    
-    cfg_path = pytestconfig.getini('alembic_config_file')
-    alembic_cfg = AlembicConfig(str(cfg_path.resolve())) 
-
-    url = sa.make_url(alembic_cfg.get_main_option('sqlalchemy.url'))
-    url = url._replace(database=testdb_name)
-    alembic_cfg.set_main_option("sqlalchemy.url", url.render_as_string(hide_password=False))
-    
-    engine = create_async_engine(alembic_cfg.get_main_option('sqlalchemy.url'), 
-                               echo=False, 
-                               json_serializer=json_serializer)
-    return TestConfig(engine, 
-                      alembic_cfg, 
-                      call_create_destroy, 
-                      call_run_migrations)
-
-
-def pytest_addoption(parser: pytest.Parser, 
-                     pluginmanager: pytest.PytestPluginManager): 
+def pytest_addoption(
+    parser: pytest.Parser, pluginmanager: pytest.PytestPluginManager
+) -> None:
     parser.addini(
-        'alembic_config_file', 
-        'path to alembic config file. Default is ./alembic', 
-        type='paths', 
-        default=pathlib.Path('alembic.ini')) 
+        "alembic_config_file",
+        "path to alembic config file. Default is ./alembic",
+        type="paths",
+        default=[pathlib.Path("alembic.ini")],
+    )
 
 
+@pytest.fixture(scope="session")
+def aiodal_test_config(
+    pytestconfig: pytest.Config,
+    testdb_name: str,
+    json_serializer: JsonSerializerT,
+    call_create_destroy: bool,
+    call_run_migrations: bool,
+) -> TestConfig:
+    """Override this to change how you want your engine to setup for the duration of the session"""
 
-@pytest.fixture(scope='session')
-async def db(aiodal_test_config): 
-    """ Create the database and mirate using an os call to alembic. 
-    Setup the database internals and seed critical data. 
+    cfg_path = pytestconfig.getini("alembic_config_file")
+
+    # This is to narrow the type (its a union ) to pathlib.Path so mypy does not complain
+    assert isinstance(cfg_path, list)
+    if len(cfg_path) > 1:
+        raise ValueError("Can only point to one alembic.ini path.")
+    assert isinstance(cfg_path[0], pathlib.Path)
+
+    almebic_path: str = str(cfg_path[0].resolve())
+
+    alembic_cfg = AlembicConfig(almebic_path)
+    sqlalchemy_url = alembic_cfg.get_main_option("sqlalchemy.url")
+
+    assert sqlalchemy_url is not None
+
+    url = sa.make_url(sqlalchemy_url)
+    url = url._replace(database=testdb_name)
+    alembic_cfg.set_main_option(
+        "sqlalchemy.url", url.render_as_string(hide_password=False)
+    )
+
+    testing_sqlalchemy_url = alembic_cfg.get_main_option("sqlalchemy.url")
+    assert testing_sqlalchemy_url is not None
+
+    engine = create_async_engine(
+        testing_sqlalchemy_url,
+        echo=False,
+        json_serializer=json_serializer,
+    )
+    return TestConfig(engine, alembic_cfg, call_create_destroy, call_run_migrations)
+
+
+@pytest.fixture(scope="session")
+async def db(aiodal_test_config: TestConfig) -> AsyncIterator[DataAccessLayer]:
+    """Create the database and mirate using an os call to alembic.
+    Setup the database internals and seed critical data.
     Yield the DataAccessLayer object for the rest of the tests.
-    
+
     """
-    # test db name is autogenerated 
-    engine, alembic_cfg, call_create_destroy, call_run_migrations = \
-        aiodal_test_config.engine, aiodal_test_config.alembic_cfg,\
-        aiodal_test_config.call_create_destroy, aiodal_test_config.call_run_migrations
+    # test db name is autogenerated
+    engine, alembic_cfg, call_create_destroy, call_run_migrations = (
+        aiodal_test_config.engine,
+        aiodal_test_config.alembic_cfg,
+        aiodal_test_config.call_create_destroy,
+        aiodal_test_config.call_run_migrations,
+    )
     test_url = engine.url.render_as_string(hide_password=False)
 
-
     try:
-        
-        if call_create_destroy: 
+        if call_create_destroy:
             await create_database(test_url)
-        
+
         if call_run_migrations:
             await run_migrations(engine, alembic_cfg)
-        
+
         db = DataAccessLayer()
         meta = sa.MetaData()
-        
+
         await db.reflect(engine, meta)
-        yield db 
+        yield db
     except Exception as err:
         logger.exception(err)
-    finally: 
+    finally:
         await engine.dispose()
-        if call_create_destroy_database:
+        if call_create_destroy:
             await drop_database(test_url)
 
 
 @pytest.fixture
-async def transaction(db): 
-    """ auto rollback. Used by get_transaction to create isolation in tests."""
-    async with db.engine.connect() as conn: 
+async def transaction(db: DataAccessLayer) -> AsyncIterator[TransactionManager]:
+    """auto rollback. Used by get_transaction to create isolation in tests."""
+    async with db.engine.connect() as conn:
         transaction = TransactionManager(conn, db)
-        try: 
+        try:
             yield transaction
         finally:
             await transaction.rollback()

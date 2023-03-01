@@ -39,7 +39,7 @@ def engine_echo() -> bool:
 
 @pytest.fixture(scope="session")
 def async_engine(
-    postgres_testdb_uri, engine_echo, json_serializer: JsonSerializerT
+    postgres_testdb_uri: str, engine_echo: bool, json_serializer: JsonSerializerT
 ) -> AsyncEngine:
     return create_async_engine(
         url=postgres_testdb_uri,

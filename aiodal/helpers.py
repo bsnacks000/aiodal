@@ -29,7 +29,7 @@ class CustomJsonEncoder(json.JSONEncoder):
         return super().default(o)
 
 
-def json_serializer(o: Any):
+def json_serializer(o: Any) -> str:
     """A simple callable wrapper using the standard json library, provided as a convenience for working
     with JSONB. Pass this to an AsyncEngine
 

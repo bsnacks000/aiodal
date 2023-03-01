@@ -31,7 +31,7 @@ jobs:
       POSTGRES_USER: bsnacks000
       POSTGRES_PASSWORD: iamgroot666
       POSTGRES_HOST: tsdb
-      POSTGRES_PORT: 5432 # default
+      POSTGRES_PORT: 5432
       ENVIRONMENT: testing
 
     steps:

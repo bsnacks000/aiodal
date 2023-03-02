@@ -14,7 +14,7 @@ What about the ORM? We've been using `sqlalchemy` for many years in a variety of
 * When asyncio support was first introduced we could only use it with core and have developed alot of projects without the ORM. We prefer async python in our stack.  
 * We use pydantic for object modeling and many of these models do not always map directly to a database table, but rather a complicated. We found it inconvenient and redundent to keep lots of models around for these different contexts
 
-After doing a number of projects without the ORM we've found we don't really miss it all that much. Using `core` with the reflection API keeps the parts of our business logic related to querying away from object serialization and other application code which is nice.   
+After doing a number of projects without the ORM we've found we don't really miss it all that much. Using `core` with the reflection API keeps the parts of our business logic related to querying away from object serialization and other application code which is nice. There are generally only one set of "models" for the project and these are often used with pydantic.
 
 This little API is the backbone of most of our database and rest API projects.
 
@@ -24,10 +24,11 @@ A `TransactionManager` is created via an async `contextmanager` by passing in a 
 
 I've included a json encoder that we use that will handle enums and datetimes.  
 
+Even though we use postgres and I am testing this code using asyncpg and alembic this _should_ be compatible with any async sqlalchemy driver for any of the supported databases.
 
 ## pytest-plugin
 
-Probably most useful is the pytest plugin. We've chosen to decouple it from `alembic` which means your dev environment will have to manage set up and tear down for any tests. You can use the `testing.yaml` file as an example of how this might work.
+Probably most useful is the pytest plugin. We've chosen to decouple it from `alembic` which means your dev environment will have to manage set up and tear down for any tests. You can look at our `docker-compose.yaml` file to see how this can be done using `psql` for isolating local tests. 
 
 There are a number of python fixutres provided to setup an engine, but the minimal conftest should just need the following.
 ```python 

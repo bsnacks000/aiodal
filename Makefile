@@ -1,18 +1,12 @@
 test:
-	docker-compose run --rm -e ENVIRONMENT=testing app poetry run pytest -v --cov=aiodal/ --cov-report=term-missing
-
-test-marker:
-	docker-compose run --rm -e ENVIRONMENT=testing app poetry run pytest -v -s -m $(marker) --cov=aiodal/ --cov-report=term-missing
-
-test-single-module:
-	docker-compose run --rm -e ENVIRONMENT=testing app poetry run pytest --cov=bemadb/ --cov-report=term-missing $(module) -v -s
+	docker compose run --rm -e ENVIRONMENT=testing testapp  && docker compose down
 
 upgrade-head:
-	docker-compose run --rm app alembic upgrade head 
+	docker compose run --rm app alembic upgrade head && docker compose down
 
 downgrade-base:
-	docker-compose run --rm app alembic downgrade base
+	docker compose run --rm app alembic downgrade base && docker compose down
 
 sql-migrate-upgrade: 
-	docker-compose run --rm app alembic upgrade head --sql
+	docker compose run --rm app alembic upgrade head --sql && docker compose down
 

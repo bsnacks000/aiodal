@@ -21,7 +21,7 @@ jobs:
         env:
           POSTGRES_USER: bsnacks000
           POSTGRES_PASSWORD: iamgroot666
-          POSTGRES_DB: aiodaldb
+          POSTGRES_DB: testdb
         options: >-
           --health-cmd pg_isready 
           --health-interval 10s 
@@ -29,9 +29,9 @@ jobs:
           --health-retries 5
     env:
       POSTGRES_USER: bsnacks000
-      POSTGRES_PASSWORD: suchsecure666
+      POSTGRES_PASSWORD: iamgroot666
       POSTGRES_HOST: tsdb
-      POSTGRES_PORT: 5432 # default
+      POSTGRES_PORT: 5432
       ENVIRONMENT: testing
 
     steps:
@@ -43,6 +43,9 @@ jobs:
 
       - name: Install dependencies
         run: poetry install
+
+      - name: Run migrations
+        run: poetry run alembic upgrade head
 
       - name: Run tests
         run: poetry run pytest -v --cov=aiodal/ --cov-report=term-missing

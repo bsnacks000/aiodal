@@ -1,50 +1,69 @@
-from typing import Callable, Any, AsyncIterator
-import sqlalchemy as sa
+from typing import Callable, Any, AsyncIterator, Dict
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine
 from .dal import DataAccessLayer, TransactionManager
 from . import helpers
 
 import pytest
-
 import logging
 
-logger = logging.getLogger(__name__)
-
-
-import dataclasses
+logger = logging.getLogger(__file__)
 
 JsonSerializerT = Callable[[Any], str]
 
 
 @pytest.fixture(scope="session")
-def json_serializer() -> JsonSerializerT:
-    """Override this to change what function you want to use for json_serializer"""
+def engine_json_serializer() -> JsonSerializerT:
+    """Override this to return a custom json serializer function for the
+    engine to use for working with json/jsonb data.
+
+    Returns:
+        JsonSerializerT: Wrapper function around json.dumps
+    """
     return helpers.json_serializer
 
 
-@dataclasses.dataclass
-class TestConfig:
-    engine: AsyncEngine
-
-
 @pytest.fixture(scope="session")
-def postgres_testdb_uri() -> str:
+def engine_uri() -> str:
+    """Override this and return a string for sqlalchemy
+
+    Returns:
+        str: The engine uri (including db driver etc.)
+    """
     return ""
 
 
 @pytest.fixture(scope="session")
 def engine_echo() -> bool:
+    """Override to set whether you want the engine to log calls during tests.
+
+    Returns:
+        bool: echo or not
+    """
     return False
 
 
 @pytest.fixture(scope="session")
+def engine_extra_kwargs() -> Dict[str, Any]:
+    """Any extra kwargs for the engine you want for your tests. Defaults to empty.
+
+    Returns:
+        Dict[str, Any]: Extra engine kwargs.
+    """
+    return {}
+
+
+@pytest.fixture(scope="session")
 def async_engine(
-    postgres_testdb_uri: str, engine_echo: bool, json_serializer: JsonSerializerT
+    engine_uri: str,
+    engine_echo: bool,
+    engine_json_serializer: JsonSerializerT,
+    engine_extra_kwargs: Dict[str, Any],
 ) -> AsyncEngine:
     return create_async_engine(
-        url=postgres_testdb_uri,
+        url=engine_uri,
         echo=engine_echo,
-        json_serializer=json_serializer,
+        json_serializer=engine_json_serializer,
+        **engine_extra_kwargs
     )
 
 
@@ -58,7 +77,6 @@ async def db(async_engine: AsyncEngine) -> AsyncIterator[DataAccessLayer]:
 
     try:
         db = DataAccessLayer()
-
         await db.reflect(async_engine)
         yield db
     except Exception as err:

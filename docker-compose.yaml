@@ -29,6 +29,27 @@ services:
     depends_on:
       - tsdb
 
+  # An example of a simple local test setup with postgres... called via Makefile
+  testapp:
+    restart: "no"
+    image: aiodal:dev
+    container_name: "aiodal_testapp"
+    build: .
+    volumes:
+      - .:/app
+    command:
+      - /bin/sh
+      - -c
+      - |
+        PGPASSWORD=${POSTGRES_PASSWORD} dropdb -h tsdb -p 5432 -U ${POSTGRES_USER} -e -f --if-exists testdb && \
+        PGPASSWORD=${POSTGRES_PASSWORD} createdb -h tsdb -p 5432 -U ${POSTGRES_USER} -e testdb
+        poetry run alembic upgrade head
+        poetry run pytest -s -v --cov=aiodal/ --cov-report=term-missing
+        poetry run mypy aiodal --strict
+        PGPASSWORD=${POSTGRES_PASSWORD} dropdb -h tsdb -p 5432 -U ${POSTGRES_USER} -e -f --if-exists testdb
+    depends_on:
+      - tsdb
+
 volumes:
   pgdata:
 

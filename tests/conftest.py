@@ -11,5 +11,5 @@ def anyio_backend():
 
 
 @pytest.fixture(scope="session")
-def postgres_testdb_uri() -> str:
+def engine_uri() -> str:
     return POSTGRES_TEST_URI

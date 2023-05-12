@@ -53,6 +53,10 @@ class BookListQ(
     __db_obj__ = ReadableBookDBEntity
 
 
+class BookDetailQ(query.DetailQ[ReadableBookDBEntity]):
+    __db_obj__ = ReadableBookDBEntity
+
+
 async def test_dbentity_query_stmt(transaction):
     # setup
     author = transaction.get_table("author")
@@ -85,5 +89,13 @@ async def test_dbentity_query_stmt(transaction):
     l = BookListQ(where=params)
     res = await l.list(transaction)
     assert len(res) == 1
+
+    id_params = query.IdParamsModel(id_=book1.id, tablename="book")
+    dq = BookDetailQ(where=id_params)
+    res = await dq.detail(transaction)
+
+    assert res.id == book1.id
+    assert res.name == book1.name
+    assert res.author_id == book1.author_id
 
     await transaction.rollback()

@@ -117,8 +117,7 @@ class DetailQ(IDetailQ[TableDBEntityT], BaseQ[TableDBEntityT, IdParamsModel]):
 
     #in pratice:
     id_params = IdParamsModel(id_=1, tablename="book")
-    params = BookDetailQ(where=id_params)
-    dq = BookDetailQ(where=params)
+    dq = BookDetailQ(where=id_params)
     dq.detail(transaction) # returns BookDBEntity with id=1 if exists
 
     """

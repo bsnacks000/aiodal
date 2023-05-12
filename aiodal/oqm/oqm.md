@@ -11,7 +11,7 @@ class BookDBEntity(dbentity.TableDBEntity):
     author_id: int = 0
     name: str = ""
     catalog: str = ""
-    extra: Dict[str, Any] = {}
+    extra: dict[str, Any] = dataclasses.field(default_factory=lambda: {})
 
     @classmethod
     def query_stmt(cls, transaction: dal.TransactionManager) -> sa.Select[Any]:
@@ -19,7 +19,10 @@ class BookDBEntity(dbentity.TableDBEntity):
         stmt = sa.select(t).order_by(t.c.id)  # type: ignore
         return stmt
 ```
-Now if we want to query on `book` table using author name, we can build `BookQueryParams` as follows
+### List View
+To construct a list view of `book` table, we can use `ListQ(IListQ[TableDBEntityT], BaseQ[TableDBEntityT, QueryParamsModelT])` which takes a `TableDBEntity` and 
+a `QueryParamsModel`.
+We can build `BookQueryParams` that can be used to query on `book.name` and `author.name` as follows
 
 ```python
 from aiodal.oqm import filters
@@ -28,22 +31,24 @@ class BookQueryParams(filters.QueryParamsModel):
         self,
         name: Optional[str] = "",
         author_name: Optional[str] = "",
-        offset: int = Query(0, ge=0),
-        limit: int = Query(1000, ge=0, le=1000),
+        author_name_contains: Optional[str] = "",
+        offset: int = 0, # Query(0, ge=0) #optionally use fastapi.Query
+        limit: int = 1000, # Query(1000, ge=0, le=1000),
     ):
         self.offset = offset
         self.limit = limit
         self.name = name
         self.author_name = author_name
+        self.author_name_contains = author_name_contains
 
     __filterset__ = filters.FilterSet(
         [   
             filters.WhereEquals("book", "name", "name"),
             filters.WhereEquals("author", "name", "author_name"),
+            filters.WhereContains("author", "name", "author_name_contains"),
         ]
     )
 ```
-
 `filters.FilterSet` takes in a list of `WhereFilter` objects: default WhereFilter objs are: `WhereEquals`, `WhereGE`, `WhereLE`, `WhereGT`, `WhereLT`, and `WhereContains`. `WhereFilter` object takes `dbtable_name`, `dbtable_column_name` and `python_param` that correspond to `dbtable_column_name`.
 
 Next we implement a `ListQ` that works with `BookDBEntity` and `BookQueryParams`; note that `ListQ` is instaniated with `QueryParamsModel`.
@@ -57,7 +62,24 @@ class BookListQ(
 #in pratice:
 params = BookQueryParams(name="Lord Of the Tables")
 l = BookListQ(where=params)
-l.list(transaction) #returns list[TableDBEntityT] --> list[BookDBEntity]
+book_list = await l.list(transaction) #returns list[TableDBEntityT] --> list[BookDBEntity]
+```
+
+#### Detail View
+For constructing detail view, we can use `DetailQ(IDetailQ[TableDBEntityT], BaseQ[TableDBEntityT, IdParamsModel])`. Note that, unlike `ListQ`, `DetailQ` has already
+`IdParamsModel` which is a subclass of `FilterStatement`, same as `QueryParamsModel`, so we do not need to provide any other query params model.
+```python
+class BookDetailQ(
+    query.DetailQ[BookDBEntity]
+):
+
+    __db_obj__ = BookDBEntity
+
+#in pratice:
+id_=1
+id_params = query.IdParamsModel(id_, tablename="book")
+dq = BookDetailQ(where=id_params)
+book_detail = await dq.detail(transaction) # --> BookDBEntity
 ```
 
 ### Inserting

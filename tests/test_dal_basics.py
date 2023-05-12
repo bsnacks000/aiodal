@@ -33,3 +33,5 @@ async def test_dal_basics(transaction):
     result = await transaction.execute(stmt)
     mybook = result.one()
     assert mybook.name == "some book"
+
+    await transaction.rollback()

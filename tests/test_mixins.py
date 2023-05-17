@@ -56,3 +56,5 @@ async def test_mixins(transaction):
 
     authors = await Author.list(transaction, {"names": ["bob", "cath"]})
     assert len(authors) == 2
+
+    await transaction.rollback()  # adding this so that inserting here does not affect other test

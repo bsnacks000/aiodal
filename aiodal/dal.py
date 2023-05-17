@@ -5,6 +5,12 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncConnection
 import sqlalchemy as sa
 from sqlalchemy.sql import expression
 from sqlalchemy.engine import ResultProxy
+from sqlalchemy.engine.interfaces import (
+    _CoreAnyExecuteParams,
+    CoreExecuteOptionsParameter,
+)
+
+from typing import Dict, Sequence
 
 
 class DataAccessLayer(object):
@@ -15,6 +21,7 @@ class DataAccessLayer(object):
     """
 
     _constraints: dict[str, List[str]] = {}
+    _aliased_tables: Dict[str, sa.TableValuedAlias] = {}
 
     @property
     def metadata(self) -> sa.MetaData:
@@ -32,21 +39,32 @@ class DataAccessLayer(object):
         self,
         engine: AsyncEngine,
         metadata: Optional[sa.MetaData] = None,
+        schema: str | None = None,
         views: bool = True,
+        only: Sequence[str] | None = None,
+        extend_existing: bool = False,
+        autoload_replace: bool = True,
+        resolve_fks: bool = True,
+        **dialect_kwargs: Any
     ) -> None:
         """Takes an AsyncEngine and uses sqlalchemy reflection API to reflect the table data.
-        Sets this state on the object.
+            Sets this state on the object.
 
-        Ex.
-        engine = create_async_engine(...)
-        db = DataAccessLayer()
-        await db.reflect(engine)   # success!
+            Ex.
+            engine = create_async_engine(...)
+            db = DataAccessLayer()
+            await db.reflect(engine)   # success!
 
         Args:
-            engine (AsyncEngine): An AsyncEngine
-            metadata (Optional[sa.MetaData], optional): A MetaData instance,
-                if not provided then automatically creates one. Defaults to None.
-            views (bool, optional): Whether to reflect views. Defaults to True.
+            engine (AsyncEngine): The sqla engine to bind on
+            metadata (Optional[sa.MetaData], optional): An optional MetaData object. Defaults to None. If none sets to default `MetaData()`.
+            schema (str | None, optional): see `sa.MetaData.reflect`. Defaults to None.
+            views (bool, optional): see `sa.MetaData.reflect`. Defaults to True.
+            only (Sequence[str] | None, optional): see `sa.MetaData.reflect`. Defaults to None.
+            extend_existing (bool, optional): see `sa.MetaData.reflect`. Defaults to False.
+            autoload_replace (bool, optional): see `sa.MetaData.reflect`. Defaults to True.
+            resolve_fks (bool, optional): see `sa.MetaData.reflect`. Defaults to True.
+
         """
         if not metadata:
             metadata = sa.MetaData()
@@ -54,7 +72,16 @@ class DataAccessLayer(object):
         def _reflect(con: sa.Connection) -> sa.Inspector:
             assert metadata is not None
 
-            metadata.reflect(bind=con, views=views)
+            metadata.reflect(
+                bind=con,
+                views=views,
+                schema=schema,
+                only=only,
+                extend_existing=extend_existing,
+                autoload_replace=autoload_replace,
+                resolve_fks=resolve_fks,
+                **dialect_kwargs
+            )
             inspector = sa.inspect(con)
             tablenames = [t.name for t in metadata.sorted_tables]
             for t in tablenames:
@@ -68,6 +95,28 @@ class DataAccessLayer(object):
 
         self._engine = engine
         self._metadata = metadata
+
+    def set_aliased(self, name: str, t: sa.TableValuedAlias) -> None:
+        """Set an aliased table on the transaction. This is allows us to use postgres functions easily with the `oqm`.
+        See `oqm.alias`
+
+        Args:
+            name (str): The name to use for later lookup.
+            t (sa.TableValuedAlias): The TableValuedAlias
+        """
+        self._aliased_tables[name] = t
+
+    def get_aliased(self, name: str) -> sa.TableValuedAlias:
+        """Retrieve an instance of TableValuedAlias that was defined elsewhere and stored in the current transaction
+        at an earlier point.
+
+        Args:
+            name (str): The name to use for lookup.
+
+        Returns:
+            sa.TableValuedAlias: The TableValuedAlias
+        """
+        return self._aliased_tables[name]
 
     def get_table(self, name: str) -> sa.Table:
         """Get a reference to a table in the database. Should only be called after reflect.
@@ -94,7 +143,7 @@ class DataAccessLayer(object):
 
 
 class TransactionManager(object):
-    __slots__ = ("_conn", "_db")
+    __slots__ = ("_conn", "_db", "_aliased_tables")
 
     def __init__(self, conn: AsyncConnection, db: DataAccessLayer):
         """Manages the lifecycle of a transaction and allows us to proxy into both the connection
@@ -109,16 +158,47 @@ class TransactionManager(object):
         """
         self._conn = conn
         self._db = db
+        self._aliased_tables: Dict[str, sa.TableValuedAlias] = {}
 
-    def get_table(self, name: str) -> sa.Table:
-        """Get a table from the dal.
+    def set_aliased(self, name: str, t: sa.TableValuedAlias) -> None:
+        """Set an aliased table on the transaction itself. This is allows us to use functions we define for select statements
+        easily. This does not overwrite any aliased tables set in the underlying DataAccessLayer.
 
         Args:
-            name (str): _description_
+            name (str): The name to use for later lookup.
+            t (sa.TableValuedAlias): The TableValuedAlias
+        """
+        self._aliased_tables[name] = t
+
+    def get_aliased(self, name: str) -> sa.TableValuedAlias:
+        """Retrieve an instance of TableValuedAlias that was defined elsewhere and stored in the current transaction. If
+        `name` matches a name in DataAccessLayer._aliased_tables the transaction's alias will be returned first. If no
+        alias with `name` in transaction is found then it will check DataAccessLayer. This will fail with a typical KeyError if
+        it does not exist in DataAccessLayer.
+
+        Args:
+            name (str): The name to use for lookup.
 
         Returns:
-            sa.Table: _description_
+            sa.TableValuedAlias: The TableValuedAlias
         """
+
+        alias = self._aliased_tables.get(name)
+        if alias is None:
+            return self._db.get_aliased(name)
+        else:
+            return alias
+
+    def get_table(self, name: str) -> sa.Table:
+        """Get a table or view from the dal or from an alias set via `set_aliased`.
+
+        Args:
+            name (str): The name to use for lookup. This should be the name defined in the database.
+
+        Returns:
+            sa.Table: The Table.
+        """
+
         return self._db.get_table(name)
 
     def get_unique_constraint(self, tablename: str) -> List[str]:
@@ -132,7 +212,13 @@ class TransactionManager(object):
         """
         return self._db.get_unique_constraint(tablename)
 
-    async def execute(self, executable: expression.Executable) -> ResultProxy[Any]:
+    async def execute(
+        self,
+        statement: expression.Executable,
+        parameters: _CoreAnyExecuteParams | None = None,
+        *,
+        execution_options: CoreExecuteOptionsParameter | None = None
+    ) -> ResultProxy[Any]:
         """Execute a sqlalchemy statement on the connection.
 
         Args:
@@ -141,7 +227,9 @@ class TransactionManager(object):
         Returns:
             ResultProxy: A ResultProxy
         """
-        return await self._conn.execute(executable)
+        return await self._conn.execute(
+            statement, parameters, execution_options=execution_options
+        )
 
     async def commit(self) -> None:
         """Call commit on the current connection."""

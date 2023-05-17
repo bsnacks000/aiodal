@@ -27,7 +27,7 @@ async def connect(
 
     engine = create_async_engine(url, **engine_options)
     db = dal.DataAccessLayer()
-    await db.reflect(engine, metadata, reflect_views)
+    await db.reflect(engine, metadata, views=reflect_views)
 
     return db
 

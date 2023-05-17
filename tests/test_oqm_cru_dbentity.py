@@ -8,26 +8,29 @@ import pytest
 pytestmark = pytest.mark.anyio
 
 
-class BookForm(dbentity.BaseFormModel):
+@dataclasses.dataclass
+class BookForm:
     author_name: str
     name: str
     catalog: str
-    extra: Dict[str, Any] = {}
+    extra: Dict[str, Any] = dataclasses.field(default_factory=lambda: {})
 
 
-class BookPatchForm(dbentity.BaseFormModel):
+# XXX @tinbot see oqm_update test for why i had to comment out name here...
+@dataclasses.dataclass
+class BookPatchForm:
     id: int
-    name: Optional[str] = None
-    extra: Dict[str, Any] = {}
+    # name: Optional[str] = None
+    extra: Dict[str, Any] = dataclasses.field(default_factory=lambda: {})
 
 
 @dataclasses.dataclass
 class BookDBEntity(
-    dbentity.TableDBEntity,
-    dbentity.InsertableDBEntity[BookForm],
-    dbentity.UpdateableDBEntity[BookPatchForm],
+    dbentity.Queryable,
+    dbentity.Insertable[BookForm],
+    dbentity.Updateable[BookPatchForm],
 ):
-    # id: int = 0 <-- inherit from DBEntity, parent of TableDBEntity
+    id: int = 0  # NOTE tinbot I'm making us require to name an id field like any other in child.
     author_id: int = 0
     name: str = ""
     catalog: str = ""
@@ -70,7 +73,10 @@ class BookDBEntity(
         stmt = (
             sa.update(t)
             .where(t.c.id == data.id)
-            .values(**data.dict(exclude={"id"}, exclude_none=True))
+            .values(
+                **{k: v for k, v in vars(data).items() if k != "id" or k is not None}
+            )
+            .returning(t)
         )
         return stmt
 
@@ -79,18 +85,12 @@ class BookDBEntity(
         return transaction.get_table("book")
 
 
-# additional query or business logic for updating
-class BookUpdateQueryParams(filters.UpdateQueryParamsModel):
-    def __init__(self, author_name: Optional[str] = None):
-        self.author_name = author_name
-
-    __filterset__ = filters.FilterSet(
-        [
-            filters.WhereEquals("author", "name", "author_name"),
-        ]
-    )
+# XXX @tinbot ... this does not actually make sense... We should not be updating
+# an Author from a Book update... we should not really be using FilterSet to update
+# data, just the user Id and the FormData
 
 
+# NOTE It is fine to query
 class BookQueryParams(filters.QueryParamsModel):
     def __init__(
         self,
@@ -121,7 +121,7 @@ class BookListQ(
     __db_obj__ = BookDBEntity
 
 
-class BookUpdateQ(query.UpdateQ[BookDBEntity, BookPatchForm, BookUpdateQueryParams]):
+class BookUpdateQ(query.UpdateQ[BookDBEntity, BookPatchForm]):
     __db_obj__ = BookDBEntity
 
 
@@ -161,9 +161,8 @@ async def test_dbentity_create_read_update(transaction):
 
     # update
     patch_data = BookPatchForm(id=book_inserted.id, extra={"extra": "rice"})
-    params = BookUpdateQueryParams(author_name="author1")
 
-    update_q = BookUpdateQ(data=patch_data, where=params)
+    update_q = BookUpdateQ(data=patch_data)
     updated_book = await update_q.update(transaction)
     assert updated_book.name == book_inserted.name
     assert updated_book.extra["extra"] == "rice"

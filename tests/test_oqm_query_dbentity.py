@@ -9,9 +9,11 @@ pytestmark = pytest.mark.anyio
 
 
 @dataclasses.dataclass
-class ReadableBookDBEntity(dbentity.TableDBEntity):
+class ReadableBookDBEntity(dbentity.Queryable):
     # id: int = 0 <-- inherit from DBEntity, parent of TableDBEntity
+    id: int = 0
     author_id: int = 0
+    author_name: str = ""
     name: str = ""
     catalog: str = ""
     extra: dict[str, Any] = dataclasses.field(default_factory=lambda: {})
@@ -19,7 +21,12 @@ class ReadableBookDBEntity(dbentity.TableDBEntity):
     @classmethod
     def query_stmt(cls, transaction: dal.TransactionManager) -> sa.Select[Any]:
         t = transaction.get_table("book")
-        stmt = sa.select(t).order_by(t.c.id)  # type: ignore
+        u = transaction.get_table("author")
+        stmt = (
+            sa.select(t, u.c.name.label("author_name"))
+            .select_from(t.join(u, u.c.id == t.c.author_id))
+            .order_by(t.c.id)
+        )  # type: ignore
         return stmt
 
 

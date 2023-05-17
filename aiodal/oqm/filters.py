@@ -1,12 +1,14 @@
+"""Declarative API for creating dynamic where clause. Convenient for filtering GET requests from 
+incoming query parameters to avoid having to write switch blocks. Inspired by `django_filter`.
+"""
+
 import abc
 from typing import Generic, Any, Iterable, TypeVar, Optional
 from aiodal import dal
 import sqlalchemy as sa
 
-SaQuery = TypeVar("SaQuery", sa.Update, sa.Select[Any])
 
-
-class FilterStatement(abc.ABC):
+class SelectFilterStatement(abc.ABC):
     @abc.abstractmethod
     def filter_stmt(
         self,
@@ -16,28 +18,20 @@ class FilterStatement(abc.ABC):
         ...
 
 
-class UpdateFilterStatement(abc.ABC):
-    @abc.abstractmethod
-    def filter_stmt(
-        self,
-        transaction: dal.TransactionManager,
-        stmt: sa.Update,
-    ) -> sa.Update:
-        ...
+FilterStmtT = TypeVar("FilterStmtT", bound=SelectFilterStatement)
 
 
-FilterStmtT = TypeVar("FilterStmtT", bound=FilterStatement)
-UpdateFilterStmtT = TypeVar("UpdateFilterStmtT", bound=UpdateFilterStatement)
-
-
-class QueryParamsModel(FilterStatement):
+class QueryParamsModel(SelectFilterStatement):
     """Base class for all incoming query params.
     To pass in other variables for filtering on the route that you
     do not want to expose via public, simply use underscore. This is useful for
     supplying urls or filter criteria for child views.
+
+    We use limit/offset pagination to paginate so those values can be supplied here.
+    There are attached to the tail end of the query statment after any where clauses.
     """
 
-    def __init__(self, limit: int = 1000, offset: int = 0):
+    def __init__(self, limit: int | None = None, offset: int | None = None):
         self.limit = limit
         self.offset = offset
 
@@ -50,33 +44,14 @@ class QueryParamsModel(FilterStatement):
     ) -> sa.Select[Any]:
         if self.__filterset__:
             stmt = self.__filterset__.apply(transaction, stmt, self)
-        stmt = stmt.offset(self.offset).limit(self.limit)
-        return stmt
-
-
-class UpdateQueryParamsModel(UpdateFilterStatement):
-    """Base class for all incoming query params.
-    To pass in other variables for filtering on the route that you
-    do not want to expose via public, simply use underscore. This is useful for
-    supplying urls or filter criteria for child views.
-    """
-
-    __filterset__: Optional["FilterSet[Any]"] = None
-
-    def filter_stmt(
-        self,
-        transaction: dal.TransactionManager,
-        stmt: sa.Update,
-    ) -> sa.Update:
-        if self.__filterset__:
-            stmt = self.__filterset__.apply(transaction, stmt, self)
+        if self.offset:
+            stmt = stmt.offset(self.offset)
+        if self.limit:
+            stmt = stmt.limit(self.limit)
         return stmt
 
 
 QueryParamsModelT = TypeVar("QueryParamsModelT", bound=QueryParamsModel)
-UpdateQueryParamsModelT = TypeVar(
-    "UpdateQueryParamsModelT", bound=UpdateQueryParamsModel
-)
 
 
 class WhereFilter(abc.ABC, Generic[QueryParamsModelT]):
@@ -89,9 +64,9 @@ class WhereFilter(abc.ABC, Generic[QueryParamsModelT]):
     def apply(
         self,
         transaction: dal.TransactionManager,
-        stmt: SaQuery,
+        stmt: sa.Select[Any],
         params: QueryParamsModelT,
-    ) -> SaQuery:
+    ) -> sa.Select[Any]:
         ...
 
 
@@ -99,9 +74,9 @@ class WhereGE(WhereFilter[QueryParamsModelT]):
     def apply(
         self,
         transaction: dal.TransactionManager,
-        stmt: SaQuery,
+        stmt: sa.Select[Any],
         params: QueryParamsModelT,
-    ) -> SaQuery:
+    ) -> sa.Select[Any]:
         if hasattr(params, self.param):
             attr = getattr(params, self.param)
             if attr:
@@ -114,9 +89,9 @@ class WhereLE(WhereFilter[QueryParamsModelT]):
     def apply(
         self,
         transaction: dal.TransactionManager,
-        stmt: SaQuery,
+        stmt: sa.Select[Any],
         params: QueryParamsModelT,
-    ) -> SaQuery:
+    ) -> sa.Select[Any]:
         if hasattr(params, self.param):
             attr = getattr(params, self.param)
             if attr:
@@ -129,9 +104,9 @@ class WhereGT(WhereFilter[QueryParamsModelT]):
     def apply(
         self,
         transaction: dal.TransactionManager,
-        stmt: SaQuery,
+        stmt: sa.Select[Any],
         params: QueryParamsModelT,
-    ) -> SaQuery:
+    ) -> sa.Select[Any]:
         if hasattr(params, self.param):
             attr = getattr(params, self.param)
             if attr:
@@ -144,9 +119,9 @@ class WhereLT(WhereFilter[QueryParamsModelT]):
     def apply(
         self,
         transaction: dal.TransactionManager,
-        stmt: SaQuery,
+        stmt: sa.Select[Any],
         params: QueryParamsModelT,
-    ) -> SaQuery:
+    ) -> sa.Select[Any]:
         if hasattr(params, self.param):
             attr = getattr(params, self.param)
             if attr:
@@ -159,9 +134,9 @@ class WhereEquals(WhereFilter[QueryParamsModelT]):
     def apply(
         self,
         transaction: dal.TransactionManager,
-        stmt: SaQuery,
+        stmt: sa.Select[Any],
         params: QueryParamsModelT,
-    ) -> SaQuery:
+    ) -> sa.Select[Any]:
         if hasattr(params, self.param):
             attr = getattr(params, self.param)
             if attr:
@@ -174,9 +149,9 @@ class WhereContains(WhereFilter[QueryParamsModelT]):
     def apply(
         self,
         transaction: dal.TransactionManager,
-        stmt: SaQuery,
+        stmt: sa.Select[Any],
         params: QueryParamsModelT,
-    ) -> SaQuery:
+    ) -> sa.Select[Any]:
         if hasattr(params, self.param):
             attr = getattr(params, self.param)
             if attr:
@@ -192,15 +167,16 @@ class FilterSet(Generic[QueryParamsModelT]):
     def apply(
         self,
         transaction: dal.TransactionManager,
-        stmt: SaQuery,
+        stmt: sa.Select[Any],
         params: QueryParamsModelT,
-    ) -> SaQuery:
+    ) -> sa.Select[Any]:
         for w in self.wheres:
             stmt = w.apply(transaction, stmt, params)
         return stmt
 
 
-class IdParamsModel(FilterStatement):
+# Useful concrete class...
+class IdParamsModel(SelectFilterStatement):
     def __init__(self, id_: int, tablename: str, id_col_name: str = "id"):
         self.id = id_
         self.tablename = tablename

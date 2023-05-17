@@ -1,22 +1,23 @@
 from .. import dal
 from .filters import QueryParamsModel
 from .query import ListQ
-from .dbentity import TableDBEntityT
+from .dbentity import QueryableT
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncConnection
 import abc
-from typing import TypeVar, Any
+from typing import TypeVar, Any, Dict
 
 
+# TODO incorporate this into the regular transaction manager without breaking it
 class AliasingTransactionManager(dal.TransactionManager):
     def __init__(self, conn: AsyncConnection, db: dal.DataAccessLayer):
         super().__init__(conn, db)
-        self._aliased_tables: dict[str, sa.TableValuedAlias] = {}
+        self._aliased_tables: Dict[str, sa.TableValuedAlias] = {}
 
     def set_aliased(self, name: str, t: sa.TableValuedAlias) -> None:
         self._aliased_tables[name] = t
 
-    def get_table(self, name: str) -> sa.Table | sa.TableValuedAlias:  # type: ignore
+    def get_table(self, name: str) -> sa.Table | sa.TableValuedAlias:
         aliased = self._aliased_tables.get(name)
         if aliased is not None:
             return aliased
@@ -37,7 +38,7 @@ AliasedQueryParamsModelT = TypeVar(
 )
 
 
-class AliasedListQ(ListQ[TableDBEntityT, AliasedQueryParamsModelT]):
+class AliasedListQ(ListQ[QueryableT, AliasedQueryParamsModelT]):
     def __init__(self, where: AliasedQueryParamsModelT):
         self.where = where
 

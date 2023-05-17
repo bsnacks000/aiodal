@@ -8,15 +8,20 @@ import pytest
 pytestmark = pytest.mark.anyio
 
 
-class BookPatchForm(dbentity.BaseFormModel):
+# NOTE @tinbot since removing pydantic the patch form must be explicit in this case
+# in the tests having name: None was auto-ignored which is very pydantic behavior
+# when I made the FormT more generic the test failed with assert None == book1.name
+# in practice we would configure any forms to handle this sort of behavior if needed
+@dataclasses.dataclass
+class BookPatchForm:
     id: int
-    name: Optional[str] = None
-    extra: Dict[str, Any] = {}
+    #    name: Optional[str] = None
+    extra: Dict[str, Any] = dataclasses.field(default_factory=lambda: {})
 
 
 @dataclasses.dataclass
-class UpdateableBookDBEntity(dbentity.UpdateableDBEntity[BookPatchForm]):
-    # id: int = 0 <-- inherit from DBEntity, parent of InsertableDBEntity
+class UpdateableBookDBEntity(dbentity.Updateable[BookPatchForm]):
+    id: int = 0
     author_id: int = 0
     name: str = ""
     catalog: str = ""
@@ -27,10 +32,12 @@ class UpdateableBookDBEntity(dbentity.UpdateableDBEntity[BookPatchForm]):
         cls, transaction: dal.TransactionManager, data: BookPatchForm
     ) -> sa.Update:
         t = transaction.get_table("book")
+
         stmt = (
             sa.update(t)
             .where(t.c.id == data.id)
-            .values(**data.dict(exclude={"id"}, exclude_none=True))
+            .values(**{k: v for k, v in vars(data).items() if k != "id" or k is not None})  # type: ignore
+            .returning(t)
         )
         return stmt
 
@@ -39,21 +46,7 @@ class UpdateableBookDBEntity(dbentity.UpdateableDBEntity[BookPatchForm]):
         return transaction.get_table("book")
 
 
-# additional query or business logic for updating
-class BookUpdateQueryParams(filters.UpdateQueryParamsModel):
-    def __init__(self, author_name: Optional[str] = None):
-        self.author_name = author_name
-
-    __filterset__ = filters.FilterSet(
-        [
-            filters.WhereEquals("author", "name", "author_name"),
-        ]
-    )
-
-
-class BookUpdateQ(
-    query.UpdateQ[UpdateableBookDBEntity, BookPatchForm, BookUpdateQueryParams]
-):
+class BookUpdateQ(query.UpdateQ[UpdateableBookDBEntity, BookPatchForm]):
     __db_obj__ = UpdateableBookDBEntity
 
 
@@ -79,18 +72,17 @@ async def test_dbentity_update(transaction):
     assert book1.name == "book1"
 
     patch_data = BookPatchForm(id=book1.id, extra={"extra": "sauce"})
-    params = BookUpdateQueryParams()
 
-    update_q = BookUpdateQ(data=patch_data, where=params)
+    update_q = BookUpdateQ(data=patch_data)
     updated_book = await update_q.update(transaction)
+    # print(updated_book)
     assert updated_book.name == book1.name
     assert updated_book.extra["extra"] == "sauce"
 
     # with update params
     patch_data = BookPatchForm(id=book1.id, extra={"extra": "rice"})
-    params = BookUpdateQueryParams(author_name="author1")
 
-    update_q = BookUpdateQ(data=patch_data, where=params)
+    update_q = BookUpdateQ(data=patch_data)
     updated_book = await update_q.update(transaction)
     assert updated_book.name == book1.name
     assert updated_book.extra["extra"] == "rice"

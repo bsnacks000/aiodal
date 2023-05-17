@@ -1,37 +1,63 @@
-from typing import Generic, Type, Any
+from typing import Generic, Type, Any, MutableSequence
 from aiodal import dal
 import sqlalchemy as sa
 from .dbentity import (
-    TableDBEntityT,
-    InsertableDBEntityT,
-    UpdateableDBEntityT,
-    BaseFormModelT,
-    IListQ,
-    IDetailQ,
-    IUpdateQ,
-    IInsertQ,
+    QueryableT,
+    InsertableT,
+    UpdateableT,
+    FormDataT,
+    DBEntityT,
 )
 from .filters import (
     FilterStmtT,
-    UpdateFilterStmtT,
     QueryParamsModelT,
     IdParamsModel,
-    UpdateQueryParamsModelT,
 )
+
+import abc
 
 sa_total_count = lambda column: sa.func.count(column).over().label("total_count")  # type: ignore
 
 
-class BaseQ(Generic[TableDBEntityT, FilterStmtT]):
-    """Base Query class that constructs where stmt from DBEntity.query_stmt and where stmts from Filters and executes the final statement."""
+class IListQ(abc.ABC, Generic[DBEntityT]):
+    @abc.abstractmethod
+    async def list(
+        self,
+        t: dal.TransactionManager,
+    ) -> MutableSequence[DBEntityT]:
+        ...
 
-    __db_obj__: Type[TableDBEntityT]
+
+class IDetailQ(abc.ABC, Generic[DBEntityT]):
+    @abc.abstractmethod
+    async def detail(self, t: dal.TransactionManager) -> DBEntityT:
+        ...
+
+
+class IInsertQ(abc.ABC, Generic[DBEntityT]):
+    @abc.abstractmethod
+    async def insert(self, t: dal.TransactionManager) -> DBEntityT:
+        ...
+
+
+class IUpdateQ(abc.ABC, Generic[DBEntityT]):
+    @abc.abstractmethod
+    async def update(self, t: dal.TransactionManager) -> DBEntityT:
+        ...
+
+
+class BaseQ(abc.ABC, Generic[QueryableT, FilterStmtT]):
+    """Base Query class that constructs where stmt from DBEntity.query_stmt and where stmts from
+    Filters and executes the final statement.
+    """
+
+    __db_obj__: Type[QueryableT]
 
     def __init__(self, where: FilterStmtT):
         self.where = where
 
     @property
-    def _db_obj(self) -> Type[TableDBEntityT]:
+    def _db_obj(self) -> Type[QueryableT]:
         return self.__class__.__db_obj__
 
     def _prepare_stmt(self, transaction: dal.TransactionManager) -> sa.Select[Any]:
@@ -44,16 +70,16 @@ class BaseQ(Generic[TableDBEntityT, FilterStmtT]):
         return await t.execute(stmt)
 
 
-class BaseInsertQ(Generic[InsertableDBEntityT, BaseFormModelT]):
+class BaseInsertQ(abc.ABC, Generic[InsertableT, FormDataT]):
     """Base Insert class that constructs insert stmt from DBEntity.insert_stmt and excecutes."""
 
-    __db_obj__: Type[InsertableDBEntityT]
+    __db_obj__: Type[InsertableT]
 
-    def __init__(self, data: BaseFormModelT):
+    def __init__(self, data: FormDataT):
         self.data = data
 
     @property
-    def _db_obj(self) -> Type[InsertableDBEntityT]:
+    def _db_obj(self) -> Type[InsertableT]:
         return self.__class__.__db_obj__
 
     async def _execute(self, t: dal.TransactionManager) -> sa.CursorResult[Any]:
@@ -61,32 +87,30 @@ class BaseInsertQ(Generic[InsertableDBEntityT, BaseFormModelT]):
         return await t.execute(stmt)
 
 
-class BaseUpdateQ(Generic[UpdateableDBEntityT, BaseFormModelT, UpdateFilterStmtT]):
-    """Base Update class that constructs update stmt from DBEntity.insert_stmt and where stmts from Update Filters  and executes the final statement."""
+class BaseUpdateQ(abc.ABC, Generic[UpdateableT, FormDataT]):
+    """Base Update class that constructs update stmt from DBEntity.insert_stmt and where stmts from
+    Update Filters  and executes the final statement.
+    """
 
-    __db_obj__: Type[UpdateableDBEntityT]
+    __db_obj__: Type[UpdateableT]
 
-    def __init__(self, data: BaseFormModelT, where: UpdateFilterStmtT):
-        self.where = where
+    def __init__(self, data: FormDataT):
         self.data = data
 
     @property
-    def _db_obj(self) -> Type[UpdateableDBEntityT]:
+    def _db_obj(self) -> Type[UpdateableT]:
         return self.__class__.__db_obj__
 
     def _prepare_stmt(self, transaction: dal.TransactionManager) -> sa.Update:
-        stmt = self._db_obj.update_stmt(transaction, self.data)
-        stmt = self.where.filter_stmt(transaction, stmt)
-        stmt = stmt.returning(self._db_obj.table(transaction))
-        return stmt
+        return self._db_obj.update_stmt(transaction, self.data)
 
     async def _execute(self, t: dal.TransactionManager) -> sa.CursorResult[Any]:
-        stmt = self._prepare_stmt(t)
-        return await t.execute(stmt)
+        return await t.execute(self._prepare_stmt(t))
 
 
-class ListQ(IListQ[TableDBEntityT], BaseQ[TableDBEntityT, QueryParamsModelT]):
-    """Read Query class is the most public facing class; this calls into BaseQ._execute and returns a list of DBEntity; instantiated with QueryParamsModel.
+class ListQ(IListQ[QueryableT], BaseQ[QueryableT, QueryParamsModelT]):
+    """Read Query class is the most public facing class; this calls into BaseQ._execute and
+    returns a list of DBEntity; instantiated with QueryParamsModel.
     Example:
     class BookListQ(
         ListQ[BookDBEntity, BookQueryParams],
@@ -101,12 +125,12 @@ class ListQ(IListQ[TableDBEntityT], BaseQ[TableDBEntityT, QueryParamsModelT]):
     async def list(
         self,
         t: dal.TransactionManager,
-    ) -> list[TableDBEntityT]:
+    ) -> MutableSequence[QueryableT]:
         result = await self._execute(t)
         return [self._db_obj(**m) for m in result.mappings()]
 
 
-class DetailQ(IDetailQ[TableDBEntityT], BaseQ[TableDBEntityT, IdParamsModel]):
+class DetailQ(IDetailQ[QueryableT], BaseQ[QueryableT, IdParamsModel]):
     """Read Query class is the most public facing class; this calls into BaseQ._execute and returns a single DBEntity object; instantiated with IdParamsModel
     Example:
 
@@ -122,15 +146,15 @@ class DetailQ(IDetailQ[TableDBEntityT], BaseQ[TableDBEntityT, IdParamsModel]):
 
     """
 
-    async def detail(self, t: dal.TransactionManager) -> TableDBEntityT:
+    async def detail(self, t: dal.TransactionManager) -> QueryableT:
         result = await self._execute(t)
         r = result.one()  # raises NoResultFound or MultipleResultsFound
         return self._db_obj(**r._mapping)
 
 
 class InsertQ(
-    IInsertQ[InsertableDBEntityT],
-    BaseInsertQ[InsertableDBEntityT, BaseFormModelT],
+    IInsertQ[InsertableT],
+    BaseInsertQ[InsertableT, FormDataT],
 ):
     """Insert Query class is the most public facing class; this calls into BaseInsertQ._execute and returns a single DBEntity object;
     instantiated with BaseFormModel.
@@ -146,15 +170,15 @@ class InsertQ(
     inesert_.insert(transaction) # returns BookDBEntity that just has been inserted
     """
 
-    async def insert(self, t: dal.TransactionManager) -> InsertableDBEntityT:
+    async def insert(self, t: dal.TransactionManager) -> InsertableT:
         result = await self._execute(t)
         r = result.one()
         return self._db_obj(**r._mapping)
 
 
 class UpdateQ(
-    IUpdateQ[UpdateableDBEntityT],  # Inherit from IUpdateQ instead since this is update
-    BaseUpdateQ[UpdateableDBEntityT, BaseFormModelT, UpdateQueryParamsModelT],
+    IUpdateQ[UpdateableT],
+    BaseUpdateQ[UpdateableT, FormDataT],
 ):
     """UpdateQuery class is the most public facing class; this calls into BaseUpdateQ._execute and returns a single DBEntity object;
     instantiated with BaseFormModel and UpdateQueryParams, which can be just a placeholder class or in which additional filter logic can be implemented.
@@ -174,7 +198,7 @@ class UpdateQ(
     updated_book = await update_q.update(transaction) #book with id 1 has its extra field updated
     """
 
-    async def update(self, t: dal.TransactionManager) -> UpdateableDBEntityT:
+    async def update(self, t: dal.TransactionManager) -> UpdateableT:
         result = await self._execute(t)
         r = result.one()
         return self._db_obj(**r._mapping)

@@ -8,19 +8,20 @@ import pytest
 pytestmark = pytest.mark.anyio
 
 
-# no need to use author_name here
-class BookForm(dbentity.BaseFormModel):
+@dataclasses.dataclass
+class BookForm:
     author_id: int
     name: str
     catalog: str
-    extra: Dict[str, Any] = {}
+    extra: Dict[str, Any] = dataclasses.field(default_factory=lambda: {})
 
 
 @dataclasses.dataclass
 class BookDBEntity(
-    dbentity.TableDBEntity,
-    dbentity.InsertableDBEntity[BookForm],
+    dbentity.Queryable,
+    dbentity.Insertable[BookForm],
 ):
+    id: int = 0
     author_id: int = 0
     name: str = ""
     catalog: str = ""

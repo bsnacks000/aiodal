@@ -8,16 +8,17 @@ import pytest
 pytestmark = pytest.mark.anyio
 
 
-class BookForm(dbentity.BaseFormModel):
+@dataclasses.dataclass
+class BookForm:
     author_name: str
     name: str
     catalog: str
-    extra: Dict[str, Any] = {}
+    extra: Dict[str, Any] = dataclasses.field(default_factory=lambda: {})
 
 
 @dataclasses.dataclass
-class InsertableBookDBEntity(dbentity.InsertableDBEntity[BookForm]):
-    # id: int = 0 <-- inherit from DBEntity, parent of InsertableDBEntity
+class InsertableBookDBEntity(dbentity.Insertable[BookForm]):
+    id: int = 0  # <-- inherit from DBEntity, parent of InsertableDBEntity
     author_id: int = 0
     name: str = ""
     catalog: str = ""

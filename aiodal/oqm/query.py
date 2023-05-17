@@ -10,13 +10,11 @@ from .dbentity import (
 )
 from .filters import (
     FilterStmtT,
-    QueryParamsModelT,
-    IdParamsModel,
+    FilterT,
+    IdFilter,
 )
 
 import abc
-
-sa_total_count = lambda column: sa.func.count(column).over().label("total_count")  # type: ignore
 
 
 class IListQ(abc.ABC, Generic[DBEntityT]):
@@ -108,7 +106,7 @@ class BaseUpdateQ(abc.ABC, Generic[UpdateableT, FormDataT]):
         return await t.execute(self._prepare_stmt(t))
 
 
-class ListQ(IListQ[QueryableT], BaseQ[QueryableT, QueryParamsModelT]):
+class ListQ(IListQ[QueryableT], BaseQ[QueryableT, FilterT]):
     """Read Query class is the most public facing class; this calls into BaseQ._execute and
     returns a list of DBEntity; instantiated with QueryParamsModel.
     Example:
@@ -130,8 +128,8 @@ class ListQ(IListQ[QueryableT], BaseQ[QueryableT, QueryParamsModelT]):
         return [self._db_obj(**m) for m in result.mappings()]
 
 
-class DetailQ(IDetailQ[QueryableT], BaseQ[QueryableT, IdParamsModel]):
-    """Read Query class is the most public facing class; this calls into BaseQ._execute and returns a single DBEntity object; instantiated with IdParamsModel
+class DetailQ(IDetailQ[QueryableT], BaseQ[QueryableT, IdFilter]):
+    """DetailQ returns a single DBEntity object by its id
     Example:
 
     class BookDetailQ(

@@ -30,7 +30,7 @@ class ReadableBookDBEntity(dbentity.Queryable):
         return stmt
 
 
-class BookQueryParams(filters.QueryParamsModel):
+class BookQueryParams(filters.Filter):
     def __init__(
         self,
         name: Optional[str] = "",
@@ -97,7 +97,7 @@ async def test_dbentity_query_stmt(transaction):
     res = await l.list(transaction)
     assert len(res) == 1
 
-    id_params = query.IdParamsModel(id_=book1.id, tablename="book")
+    id_params = query.IdFilter(id_=book1.id, tablename="book")
     dq = BookDetailQ(where=id_params)
     res = await dq.detail(transaction)
 

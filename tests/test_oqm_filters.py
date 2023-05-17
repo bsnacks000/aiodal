@@ -51,7 +51,7 @@ class BookDBEntity(
         return stmt
 
 
-class BookQueryParams(filters.QueryParamsModel):
+class BookQueryParams(filters.Filter):
     def __init__(
         self,
         name: Optional[str] = "",

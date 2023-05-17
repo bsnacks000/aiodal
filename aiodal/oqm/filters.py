@@ -8,7 +8,7 @@ from aiodal import dal
 import sqlalchemy as sa
 
 
-class SelectFilterStatement(abc.ABC):
+class FilterStatement(abc.ABC):
     @abc.abstractmethod
     def filter_stmt(
         self,
@@ -18,14 +18,11 @@ class SelectFilterStatement(abc.ABC):
         ...
 
 
-FilterStmtT = TypeVar("FilterStmtT", bound=SelectFilterStatement)
+FilterStmtT = TypeVar("FilterStmtT", bound=FilterStatement)
 
 
-class QueryParamsModel(SelectFilterStatement):
-    """Base class for all incoming query params.
-    To pass in other variables for filtering on the route that you
-    do not want to expose via public, simply use underscore. This is useful for
-    supplying urls or filter criteria for child views.
+class Filter(FilterStatement):
+    """The basic Filter class. Runs through Filters in its filter set.
 
     We use limit/offset pagination to paginate so those values can be supplied here.
     There are attached to the tail end of the query statment after any where clauses.
@@ -51,133 +48,13 @@ class QueryParamsModel(SelectFilterStatement):
         return stmt
 
 
-QueryParamsModelT = TypeVar("QueryParamsModelT", bound=QueryParamsModel)
+FilterT = TypeVar("FilterT", bound=Filter)
 
 
-class WhereFilter(abc.ABC, Generic[QueryParamsModelT]):
-    def __init__(self, tablename: str, col: str, param: str):
-        self.tablename = tablename
-        self.col = col
-        self.param = param
+class IdFilter(FilterStatement):
+    """This is a useful concrete class that we use to filter an object by id."""
 
-    @abc.abstractmethod
-    def apply(
-        self,
-        transaction: dal.TransactionManager,
-        stmt: sa.Select[Any],
-        params: QueryParamsModelT,
-    ) -> sa.Select[Any]:
-        ...
-
-
-class WhereGE(WhereFilter[QueryParamsModelT]):
-    def apply(
-        self,
-        transaction: dal.TransactionManager,
-        stmt: sa.Select[Any],
-        params: QueryParamsModelT,
-    ) -> sa.Select[Any]:
-        if hasattr(params, self.param):
-            attr = getattr(params, self.param)
-            if attr:
-                t = transaction.get_table(self.tablename)
-                stmt = stmt.where(t.c[self.col] >= attr)
-        return stmt
-
-
-class WhereLE(WhereFilter[QueryParamsModelT]):
-    def apply(
-        self,
-        transaction: dal.TransactionManager,
-        stmt: sa.Select[Any],
-        params: QueryParamsModelT,
-    ) -> sa.Select[Any]:
-        if hasattr(params, self.param):
-            attr = getattr(params, self.param)
-            if attr:
-                t = transaction.get_table(self.tablename)
-                stmt = stmt.where(t.c[self.col] <= attr)
-        return stmt
-
-
-class WhereGT(WhereFilter[QueryParamsModelT]):
-    def apply(
-        self,
-        transaction: dal.TransactionManager,
-        stmt: sa.Select[Any],
-        params: QueryParamsModelT,
-    ) -> sa.Select[Any]:
-        if hasattr(params, self.param):
-            attr = getattr(params, self.param)
-            if attr:
-                t = transaction.get_table(self.tablename)
-                stmt = stmt.where(t.c[self.col] > attr)
-        return stmt
-
-
-class WhereLT(WhereFilter[QueryParamsModelT]):
-    def apply(
-        self,
-        transaction: dal.TransactionManager,
-        stmt: sa.Select[Any],
-        params: QueryParamsModelT,
-    ) -> sa.Select[Any]:
-        if hasattr(params, self.param):
-            attr = getattr(params, self.param)
-            if attr:
-                t = transaction.get_table(self.tablename)
-                stmt = stmt.where(t.c[self.col] < attr)
-        return stmt
-
-
-class WhereEquals(WhereFilter[QueryParamsModelT]):
-    def apply(
-        self,
-        transaction: dal.TransactionManager,
-        stmt: sa.Select[Any],
-        params: QueryParamsModelT,
-    ) -> sa.Select[Any]:
-        if hasattr(params, self.param):
-            attr = getattr(params, self.param)
-            if attr:
-                t = transaction.get_table(self.tablename)
-                stmt = stmt.where(t.c[self.col] == attr)
-        return stmt
-
-
-class WhereContains(WhereFilter[QueryParamsModelT]):
-    def apply(
-        self,
-        transaction: dal.TransactionManager,
-        stmt: sa.Select[Any],
-        params: QueryParamsModelT,
-    ) -> sa.Select[Any]:
-        if hasattr(params, self.param):
-            attr = getattr(params, self.param)
-            if attr:
-                t = transaction.get_table(self.tablename)
-                stmt = stmt.where(t.c[self.col].contains(attr))
-        return stmt
-
-
-class FilterSet(Generic[QueryParamsModelT]):
-    def __init__(self, wheres: Iterable[WhereFilter[QueryParamsModelT]]):
-        self.wheres = wheres
-
-    def apply(
-        self,
-        transaction: dal.TransactionManager,
-        stmt: sa.Select[Any],
-        params: QueryParamsModelT,
-    ) -> sa.Select[Any]:
-        for w in self.wheres:
-            stmt = w.apply(transaction, stmt, params)
-        return stmt
-
-
-# Useful concrete class...
-class IdParamsModel(SelectFilterStatement):
-    def __init__(self, id_: int, tablename: str, id_col_name: str = "id"):
+    def __init__(self, id_: Any, tablename: str, id_col_name: str = "id"):
         self.id = id_
         self.tablename = tablename
         self.id_col_name = id_col_name
@@ -189,4 +66,125 @@ class IdParamsModel(SelectFilterStatement):
     ) -> sa.Select[Any]:
         t = transaction.get_table(self.tablename)
         stmt = stmt.where(t.c[self.id_col_name] == self.id)
+        return stmt
+
+
+class WhereFilter(abc.ABC, Generic[FilterT]):
+    def __init__(self, tablename: str, col: str, param: str):
+        self.tablename = tablename
+        self.col = col
+        self.param = param
+
+    @abc.abstractmethod
+    def apply(
+        self,
+        transaction: dal.TransactionManager,
+        stmt: sa.Select[Any],
+        params: FilterT,
+    ) -> sa.Select[Any]:
+        ...
+
+
+class WhereGE(WhereFilter[FilterT]):
+    def apply(
+        self,
+        transaction: dal.TransactionManager,
+        stmt: sa.Select[Any],
+        params: FilterT,
+    ) -> sa.Select[Any]:
+        if hasattr(params, self.param):
+            attr = getattr(params, self.param)
+            if attr:
+                t = transaction.get_table(self.tablename)
+                stmt = stmt.where(t.c[self.col] >= attr)
+        return stmt
+
+
+class WhereLE(WhereFilter[FilterT]):
+    def apply(
+        self,
+        transaction: dal.TransactionManager,
+        stmt: sa.Select[Any],
+        params: FilterT,
+    ) -> sa.Select[Any]:
+        if hasattr(params, self.param):
+            attr = getattr(params, self.param)
+            if attr:
+                t = transaction.get_table(self.tablename)
+                stmt = stmt.where(t.c[self.col] <= attr)
+        return stmt
+
+
+class WhereGT(WhereFilter[FilterT]):
+    def apply(
+        self,
+        transaction: dal.TransactionManager,
+        stmt: sa.Select[Any],
+        params: FilterT,
+    ) -> sa.Select[Any]:
+        if hasattr(params, self.param):
+            attr = getattr(params, self.param)
+            if attr:
+                t = transaction.get_table(self.tablename)
+                stmt = stmt.where(t.c[self.col] > attr)
+        return stmt
+
+
+class WhereLT(WhereFilter[FilterT]):
+    def apply(
+        self,
+        transaction: dal.TransactionManager,
+        stmt: sa.Select[Any],
+        params: FilterT,
+    ) -> sa.Select[Any]:
+        if hasattr(params, self.param):
+            attr = getattr(params, self.param)
+            if attr:
+                t = transaction.get_table(self.tablename)
+                stmt = stmt.where(t.c[self.col] < attr)
+        return stmt
+
+
+class WhereEquals(WhereFilter[FilterT]):
+    def apply(
+        self,
+        transaction: dal.TransactionManager,
+        stmt: sa.Select[Any],
+        params: FilterT,
+    ) -> sa.Select[Any]:
+        if hasattr(params, self.param):
+            attr = getattr(params, self.param)
+            if attr:
+                t = transaction.get_table(self.tablename)
+                stmt = stmt.where(t.c[self.col] == attr)
+        return stmt
+
+
+class WhereContains(WhereFilter[FilterT]):
+    def apply(
+        self,
+        transaction: dal.TransactionManager,
+        stmt: sa.Select[Any],
+        params: FilterT,
+    ) -> sa.Select[Any]:
+        if hasattr(params, self.param):
+            attr = getattr(params, self.param)
+            if attr:
+                t = transaction.get_table(self.tablename)
+                stmt = stmt.where(t.c[self.col].contains(attr))
+        return stmt
+
+
+class FilterSet(Generic[FilterT]):
+    def __init__(self, wheres: Iterable[WhereFilter[FilterT]]):
+        self.wheres = wheres
+
+    def apply(
+        self,
+        transaction: dal.TransactionManager,
+        stmt: sa.Select[Any],
+        params: FilterT,
+    ) -> sa.Select[Any]:
+        for w in self.wheres:
+            stmt = w.apply(transaction, stmt, params)
         return stmt

@@ -91,7 +91,7 @@ class BookDBEntity(
 
 
 # NOTE It is fine to query
-class BookQueryParams(filters.QueryParamsModel):
+class BookQueryParams(filters.Filter):
     def __init__(
         self,
         name: Optional[str] = "",

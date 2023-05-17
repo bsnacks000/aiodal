@@ -1,7 +1,7 @@
 import json
 import datetime
 import enum
-
+import sqlalchemy as sa
 from typing import Any
 
 
@@ -43,3 +43,16 @@ def json_serializer(o: Any) -> str:
         str: _description_
     """
     return json.dumps(o, cls=CustomJsonEncoder)
+
+
+def sa_total_count(c: sa.Column[Any]) -> Any:
+    """Handy shortcut for returning total_count. Useful for paginating. Pass a
+    unique column in your query to get the count before limit/offset is applied.
+
+    Args:
+        c (sa.Column): A sqla column. Should be unique like "id"
+
+    Returns:
+        sa.Label: The labeled Column (total_count)
+    """
+    return sa.func.count(c).over().label("total_count")  # type: ignore

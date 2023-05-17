@@ -62,3 +62,47 @@ async def test_dal_setters_getters(engine_uri, transaction):
 
     book_constraint = db.get_unique_constraint("book")
     assert book_constraint == ["catalog"]
+
+
+async def test_dal_transaction_context(engine_uri, transaction):
+    # Ensure transactions are committed once the context ends
+    db = await connect.or_fail(url=engine_uri)
+    async with dal.transaction(db) as db_transaction:
+        author = db_transaction.get_table("author")
+        stmt = (
+            sa.insert(author)
+            .values(name="bsnacks")
+            .returning(author.c.id, author.c.name)
+        )
+        result = await db_transaction.execute(stmt)
+
+    result = await transaction.execute(sa.select(author).filter_by(name="bsnacks"))
+    result = result.all()
+    assert len(result) == 1
+
+    async with dal.transaction(db) as db_transaction:
+        author = db_transaction.get_table("author")
+        stmt = sa.delete(author)
+        await db_transaction.execute(stmt)
+
+    result = await transaction.execute(sa.select(author).filter_by(name="bsnacks"))
+    result = result.all()
+    assert len(result) == 0
+
+    # Ensure transactions get rolled back in case of an exception.
+    try:
+        async with dal.transaction(db) as db_transaction:
+            author = db_transaction.get_table("author")
+            stmt = (
+                sa.insert(author)
+                .values(name="bsnacks")
+                .returning(author.c.id, author.c.name)
+            )
+            result = await db_transaction.execute(stmt)
+            raise Exception("Generic exception")
+    except Exception:
+        pass
+
+    result = await transaction.execute(sa.select(author).filter_by(name="bsnacks"))
+    result = result.all()
+    assert len(result) == 0

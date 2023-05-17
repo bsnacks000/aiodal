@@ -1,6 +1,7 @@
 import pytest
 import sqlalchemy as sa
 import datetime
+from aiodal import dal, connect
 
 pytestmark = pytest.mark.anyio
 
@@ -35,3 +36,22 @@ async def test_dal_basics(transaction):
     assert mybook.name == "some book"
 
     await transaction.rollback()
+
+
+async def test_dal_setters_getters(engine_uri):
+    tablename = "Table name"
+    value = "Testing value"
+    obj = dal.DataAccessLayer()
+    obj.set_aliased(name=tablename, t=value)
+    assert obj._aliased_tables[tablename] == value
+    assert obj.get_aliased(name=tablename) == value
+
+    db = await connect.or_fail(url=engine_uri, with_exit=False)
+    author_table = db.get_table("author")
+    assert author_table is not None
+
+    with pytest.raises(KeyError):
+        this_table_doesnt_exist = db.get_table("nonexistent table")
+
+    book_constraint = db.get_unique_constraint("book")
+    assert book_constraint == ["catalog"]

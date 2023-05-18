@@ -1,4 +1,5 @@
 import pytest
+from enum import Enum
 
 POSTGRES_TEST_URI = "postgresql+asyncpg://bsnacks000:iamgroot666@tsdb:5432/testdb"
 
@@ -13,3 +14,14 @@ def anyio_backend():
 @pytest.fixture(scope="session")
 def engine_uri() -> str:
     return POSTGRES_TEST_URI
+
+
+class TestingEnum(Enum):
+    RED = 1
+    BLUE = 2
+    GREEN = 3
+
+
+@pytest.fixture(scope="session")
+def testing_enum() -> Enum:
+    return TestingEnum

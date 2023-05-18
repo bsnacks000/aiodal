@@ -1,7 +1,7 @@
 """ These are stubs and mixins that form the backbone of `oqm`. We use 2 generic constructs: A DBEntityT is any representation that 
 comes from the database. A FormDataT is any input that can be inserted or updated in the database.
 """
-from typing import TypeVar, Generic, Any
+from typing import TypeVar, Generic, Any, Protocol
 import abc
 from aiodal import dal
 import sqlalchemy as sa
@@ -12,7 +12,12 @@ DBEntityT = TypeVar(
 FormDataT = TypeVar("FormDataT")  # generic T used to handle form data
 
 
-class Queryable(abc.ABC):
+class Constructable(Protocol):
+    def __init__(self, *args: Any, **kwargs: Any):
+        ...
+
+
+class Queryable(Constructable, abc.ABC):
     """enable a dbentity to be readable/query-able; works with QueryParamsModel which
     adds additonal where stmt to the output from query_stmt
     """
@@ -26,7 +31,7 @@ class Queryable(abc.ABC):
         ...
 
 
-class Insertable(abc.ABC, Generic[FormDataT]):
+class Insertable(Constructable, abc.ABC, Generic[FormDataT]):
     """enable a dbentity to be writable; takes a pydantic BaseForm model, which contains data to be inserted into db."""
 
     @classmethod
@@ -37,7 +42,7 @@ class Insertable(abc.ABC, Generic[FormDataT]):
         ...
 
 
-class Updateable(Generic[FormDataT]):
+class Updateable(Constructable, Generic[FormDataT]):
     """enable a dbentity to be updateable; takes a pydantic BaseForm model, which contains data to be inserted into db, and
     a UpdateQueryParamsModel, in which addtional filtering logic can be implemented."""
 

@@ -49,22 +49,15 @@ def engine_extra_kwargs() -> Dict[str, Any]:
     Returns:
         Dict[str, Any]: Extra engine kwargs.
     """
-    return {}
+    return {"json_serializer": helpers.json_serializer, "echo": False}
 
 
 @pytest.fixture(scope="session")
 def async_engine(
     engine_uri: str,
-    engine_echo: bool,
-    engine_json_serializer: JsonSerializerT,
     engine_extra_kwargs: Dict[str, Any],
 ) -> AsyncEngine:
-    return create_async_engine(
-        url=engine_uri,
-        echo=engine_echo,
-        json_serializer=engine_json_serializer,
-        **engine_extra_kwargs
-    )
+    return create_async_engine(url=engine_uri, **engine_extra_kwargs)
 
 
 @pytest.fixture(scope="session")

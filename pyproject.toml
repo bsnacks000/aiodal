@@ -27,6 +27,3 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.plugins.pytest11]
 aiodal_plugin = "aiodal.pytest_plugin"
-
-[tool.coverage.report]
-exclude_lines = [ "pragma: no cover",]

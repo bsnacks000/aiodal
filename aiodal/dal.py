@@ -96,9 +96,7 @@ class DataAccessLayer(object):
         self._engine = engine
         self._metadata = metadata
 
-    def set_aliased(
-        self, name: str, t: sa.TableValuedAlias
-    ) -> None:  # pragma: no cover
+    def set_aliased(self, name: str, t: sa.TableValuedAlias) -> None:
         """Set an aliased table on the transaction. This is allows us to use postgres functions easily with the `oqm`.
         See `oqm.alias`
 
@@ -108,7 +106,7 @@ class DataAccessLayer(object):
         """
         self._aliased_tables[name] = t
 
-    def get_aliased(self, name: str) -> sa.TableValuedAlias:  # pragma: no cover
+    def get_aliased(self, name: str) -> sa.TableValuedAlias:
         """Retrieve an instance of TableValuedAlias that was defined elsewhere and stored in the current transaction
         at an earlier point.
 
@@ -120,7 +118,7 @@ class DataAccessLayer(object):
         """
         return self._aliased_tables[name]
 
-    def get_table(self, name: str) -> sa.Table:  # pragma: no cover
+    def get_table(self, name: str) -> sa.Table:
         """Get a reference to a table in the database. Should only be called after reflect.
 
         Args:
@@ -131,7 +129,7 @@ class DataAccessLayer(object):
         """
         return self._metadata.tables[name]
 
-    def get_unique_constraint(self, name: str) -> List[str]:  # pragma: no cover
+    def get_unique_constraint(self, name: str) -> List[str]:
         """Get a unique constraint by key name. This works well if you name your unique constraints
         which you really should.
 
@@ -162,9 +160,7 @@ class TransactionManager(object):
         self._db = db
         self._aliased_tables: Dict[str, sa.TableValuedAlias] = {}
 
-    def set_aliased(
-        self, name: str, t: sa.TableValuedAlias
-    ) -> None:  # pragma: no cover
+    def set_aliased(self, name: str, t: sa.TableValuedAlias) -> None:
         """Set an aliased table on the transaction itself. This is allows us to use functions we define for select statements
         easily. This does not overwrite any aliased tables set in the underlying DataAccessLayer.
 
@@ -174,7 +170,7 @@ class TransactionManager(object):
         """
         self._aliased_tables[name] = t
 
-    def get_aliased(self, name: str) -> sa.TableValuedAlias:  # pragma: no cover
+    def get_aliased(self, name: str) -> sa.TableValuedAlias:
         """Retrieve an instance of TableValuedAlias that was defined elsewhere and stored in the current transaction. If
         `name` matches a name in DataAccessLayer._aliased_tables the transaction's alias will be returned first. If no
         alias with `name` in transaction is found then it will check DataAccessLayer. This will fail with a typical KeyError if
@@ -193,7 +189,7 @@ class TransactionManager(object):
         else:
             return alias
 
-    def get_table(self, name: str) -> sa.Table:  # pragma: no cover
+    def get_table(self, name: str) -> sa.Table:
         """Get a table or view from the dal or from an alias set via `set_aliased`.
 
         Args:
@@ -205,7 +201,7 @@ class TransactionManager(object):
 
         return self._db.get_table(name)
 
-    def get_unique_constraint(self, tablename: str) -> List[str]:  # pragma: no cover
+    def get_unique_constraint(self, tablename: str) -> List[str]:
         """Get a unique constraint from the dal.
 
         Args:
@@ -222,7 +218,7 @@ class TransactionManager(object):
         parameters: _CoreAnyExecuteParams | None = None,
         *,
         execution_options: CoreExecuteOptionsParameter | None = None
-    ) -> ResultProxy[Any]:  # pragma: no cover
+    ) -> ResultProxy[Any]:
         """Execute a sqlalchemy statement on the connection.
 
         Args:
@@ -235,16 +231,16 @@ class TransactionManager(object):
             statement, parameters, execution_options=execution_options
         )
 
-    async def commit(self) -> None:  # pragma: no cover
+    async def commit(self) -> None:
         """Call commit on the current connection."""
         await self._conn.commit()
 
-    async def rollback(self) -> None:  # pragma: no cover
+    async def rollback(self) -> None:
         """Call rollback on the current connection."""
         await self._conn.rollback()
 
 
-@contextlib.asynccontextmanager  # pragma: no cover
+@contextlib.asynccontextmanager
 async def transaction(
     db: DataAccessLayer, with_commit: bool = True
 ) -> AsyncIterator[TransactionManager]:

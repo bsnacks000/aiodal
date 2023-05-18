@@ -17,7 +17,7 @@ class Constructable(Protocol):
         ...
 
 
-class Queryable(Constructable, abc.ABC):
+class Queryable(Constructable):
     """enable a dbentity to be readable/query-able; works with QueryParamsModel which
     adds additonal where stmt to the output from query_stmt
     """
@@ -31,7 +31,7 @@ class Queryable(Constructable, abc.ABC):
         ...
 
 
-class Insertable(Constructable, abc.ABC, Generic[FormDataT]):
+class Insertable(Constructable, Generic[FormDataT]):
     """enable a dbentity to be writable; takes a pydantic BaseForm model, which contains data to be inserted into db."""
 
     @classmethod

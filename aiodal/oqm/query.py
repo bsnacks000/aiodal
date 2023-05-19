@@ -47,7 +47,7 @@ class IUpdateQ(abc.ABC, Generic[DBEntityT]):
 
 class IDeleteQ(abc.ABC, Generic[DBEntityT]):
     @abc.abstractmethod
-    async def delete(self, t: dal.TransactionManager) -> DBEntityT:
+    async def delete(self, t: dal.TransactionManager) -> None:
         ...
 
 
@@ -221,3 +221,10 @@ class UpdateQ(
         result = await self._execute(t)
         r = result.one()
         return self._db_obj(**r._mapping)
+
+
+class DeleteQ(IDeleteQ[DeleteableT], BaseDeleteQ[DeleteableT]):
+    """Public facing class to delete deletable DBEntities. Returns nothing for now"""
+
+    async def delete(self, t: dal.TransactionManager) -> None:
+        await self._execute(t)

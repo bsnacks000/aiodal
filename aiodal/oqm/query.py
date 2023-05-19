@@ -44,6 +44,12 @@ class IUpdateQ(abc.ABC, Generic[DBEntityT]):
         ...
 
 
+class IDeleteQ(abc.ABC, Generic[DBEntityT]):
+    @abc.abstractmethod
+    async def delete(self, t: dal.TransactionManager) -> DBEntityT:
+        ...
+
+
 class BaseQ(abc.ABC, Generic[QueryableT, FilterStmtT]):
     """Base Query class that constructs where stmt from DBEntity.query_stmt and where stmts from
     Filters and executes the final statement.

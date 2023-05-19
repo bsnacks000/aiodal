@@ -47,7 +47,7 @@ class IUpdateQ(abc.ABC, Generic[DBEntityT]):
 
 class IDeleteQ(abc.ABC, Generic[DBEntityT]):
     @abc.abstractmethod
-    async def delete(self, t: dal.TransactionManager) -> None:
+    async def delete(self, t: dal.TransactionManager) -> DBEntityT:
         ...
 
 
@@ -110,8 +110,8 @@ class BaseDeleteQ(abc.ABC, Generic[DeleteableT, FormDataT]):
     async def _execute(
         self,
         t: dal.TransactionManager,
-    ) -> None:
-        await t.execute(self._prepare_stmt(t))
+    ) -> sa.CursorResult[Any]:
+        return await t.execute(self._prepare_stmt(t))
 
 
 class BaseUpdateQ(abc.ABC, Generic[UpdateableT, FormDataT]):
@@ -234,5 +234,7 @@ class UpdateQ(
 class DeleteQ(IDeleteQ[DeleteableT], BaseDeleteQ[DeleteableT, FormDataT]):
     """Public facing class to delete deletable DBEntities. Returns nothing for now"""
 
-    async def delete(self, t: dal.TransactionManager) -> None:
-        await self._execute(t)
+    async def delete(self, t: dal.TransactionManager) -> DeleteableT:
+        result = await self._execute(t)
+        r = result.one()
+        return self._db_obj(**r._mapping)

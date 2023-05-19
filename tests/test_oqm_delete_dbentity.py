@@ -30,7 +30,7 @@ class DeleteableBookDBEntity(dbentity.Deleteable[BookPatchForm]):
         cls, transaction: dal.TransactionManager, data: BookPatchForm
     ) -> sa.Delete:
         t = transaction.get_table("book")
-        return sa.delete(t).where(t.c.id == data.id)
+        return sa.delete(t).where(t.c.id == data.id).returning(t)
 
     @classmethod
     def table(cls, transaction: dal.TransactionManager) -> sa.Table:
@@ -64,7 +64,8 @@ async def test_dbentity_delete_stmt(transaction):
 
     patch_data = BookPatchForm(id=book1.id)
     l = BookDeleteQ(patch_data)
-    await l.delete(transaction)
+    result = await l.delete(transaction)
+    assert len(result) == 1
 
     book_contents = await transaction.execute(sa.select(book))
     book_contents = book_contents.all()

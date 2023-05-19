@@ -31,12 +31,14 @@ class Queryable(Constructable):
         ...
 
 
-class Deleteable(Constructable):
+class Deleteable(Constructable, Generic[FormDataT]):
     """Enable a dbentity to be deleteable"""
 
     @classmethod
     @abc.abstractmethod
-    def delete_stmt(cls, transaction: dal.TransactionManager) -> sa.Delete:
+    def delete_stmt(
+        cls, transaction: dal.TransactionManager, data: FormDataT
+    ) -> sa.Delete:
         ...
 
 
@@ -67,6 +69,6 @@ class Updateable(Constructable, Generic[FormDataT]):
 
 _T = Any
 QueryableT = TypeVar("QueryableT", bound=Queryable)
-DeleteableT = TypeVar("DeleteableT", bound=Deleteable)
+DeleteableT = TypeVar("DeleteableT", bound=Deleteable[_T])
 InsertableT = TypeVar("InsertableT", bound=Insertable[_T])
 UpdateableT = TypeVar("UpdateableT", bound=Updateable[_T])

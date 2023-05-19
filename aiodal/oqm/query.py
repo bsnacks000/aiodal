@@ -92,18 +92,26 @@ class BaseInsertQ(abc.ABC, Generic[InsertableT, FormDataT]):
         return await t.execute(stmt)
 
 
-class BaseDeleteQ(abc.ABC, Generic[DeleteableT]):
+class BaseDeleteQ(abc.ABC, Generic[DeleteableT, FormDataT]):
     """Base Delete class that constructs delete stmt from DBEntity.delete.stmt and executes it"""
 
     __db_obj__: Type[DeleteableT]
+
+    def __init__(self, data: FormDataT) -> None:
+        self.data = data
 
     @property
     def _db_obj(self) -> Type[DeleteableT]:
         return self.__class__.__db_obj__
 
-    async def _execute(self, t: dal.TransactionManager) -> None:
-        stmt = self._db_obj.delete_stmt(t)
-        await t.execute(stmt)
+    def _prepare_stmt(self, transaction: dal.TransactionManager) -> sa.Delete:
+        return self.__db_obj__.delete_stmt(transaction, self.data)
+
+    async def _execute(
+        self,
+        t: dal.TransactionManager,
+    ) -> None:
+        await t.execute(self._prepare_stmt(t))
 
 
 class BaseUpdateQ(abc.ABC, Generic[UpdateableT, FormDataT]):
@@ -223,7 +231,7 @@ class UpdateQ(
         return self._db_obj(**r._mapping)
 
 
-class DeleteQ(IDeleteQ[DeleteableT], BaseDeleteQ[DeleteableT]):
+class DeleteQ(IDeleteQ[DeleteableT], BaseDeleteQ[DeleteableT, FormDataT]):
     """Public facing class to delete deletable DBEntities. Returns nothing for now"""
 
     async def delete(self, t: dal.TransactionManager) -> None:

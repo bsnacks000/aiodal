@@ -64,8 +64,10 @@ async def test_dbentity_delete_stmt(transaction):
 
     patch_data = BookPatchForm(id=book1.id)
     l = BookDeleteQ(patch_data)
-    result = await l.delete(transaction)
-    assert len(result) == 1
+    deleted_book = await l.delete(transaction)
+    assert deleted_book.name == "book1"
+    assert deleted_book.catalog == None
+    assert deleted_book.extra == {}
 
     book_contents = await transaction.execute(sa.select(book))
     book_contents = book_contents.all()

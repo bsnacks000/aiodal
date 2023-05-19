@@ -5,6 +5,7 @@ from .dbentity import (
     QueryableT,
     InsertableT,
     UpdateableT,
+    DeleteableT,
     FormDataT,
     DBEntityT,
 )
@@ -89,6 +90,20 @@ class BaseInsertQ(abc.ABC, Generic[InsertableT, FormDataT]):
     async def _execute(self, t: dal.TransactionManager) -> sa.CursorResult[Any]:
         stmt = self._db_obj.insert_stmt(t, self.data)
         return await t.execute(stmt)
+
+
+class BaseDeleteQ(abc.ABC, Generic[DeleteableT]):
+    """Base Delete class that constructs delete stmt from DBEntity.delete.stmt and executes it"""
+
+    __db_obj__: Type[DeleteableT]
+
+    @property
+    def _db_obj(self) -> Type[DeleteableT]:
+        return self.__class__.__db_obj__
+
+    async def _execute(self, t: dal.TransactionManager) -> None:
+        stmt = self._db_obj.delete_stmt(t)
+        await t.execute(stmt)
 
 
 class BaseUpdateQ(abc.ABC, Generic[UpdateableT, FormDataT]):

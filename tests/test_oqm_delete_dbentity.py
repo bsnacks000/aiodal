@@ -1,11 +1,44 @@
 from aiodal.oqm import query, filters, dbentity
 from aiodal import dal
 import sqlalchemy as sa
-from typing import Any, Optional
+from typing import Any, Optional, Dict
 import dataclasses
 import pytest
 
 pytestmark = pytest.mark.anyio
+
+
+# NOTE @tinbot since removing pydantic the patch form must be explicit in this case
+# in the tests having name: None was auto-ignored which is very pydantic behavior
+# when I made the FormT more generic the test failed with assert None == book1.name
+# in practice we would configure any forms to handle this sort of behavior if needed
+@dataclasses.dataclass
+class BookPatchForm:
+    id: int
+
+
+@dataclasses.dataclass
+class DeleteableBookDBEntity(dbentity.Deleteable[BookPatchForm]):
+    id: int = 0
+    author_id: int = 0
+    name: str = ""
+    catalog: str = ""
+    extra: dict[str, Any] = dataclasses.field(default_factory=lambda: {})
+
+    @classmethod
+    def delete_stmt(
+        cls, transaction: dal.TransactionManager, data: BookPatchForm
+    ) -> sa.Delete:
+        t = transaction.get_table("book")
+        return sa.delete(t).where(t.c.id == data.id)
+
+    @classmethod
+    def table(cls, transaction: dal.TransactionManager) -> sa.Table:
+        return transaction.get_table("book")
+
+
+class BookDeleteQ(query.DeleteQ[DeleteableBookDBEntity, BookPatchForm]):
+    __db_obj__ = DeleteableBookDBEntity
 
 
 async def test_dbentity_delete_stmt(transaction):
@@ -25,28 +58,16 @@ async def test_dbentity_delete_stmt(transaction):
     result = await transaction.execute(stmt)
     book1 = result.one()
 
-    # actual testing
-    # params = BookQueryParams(name="book1")
-    # l = BookListQ(where=params)
-    # res = await l.list(transaction)
-    # assert len(res) == 1
+    book_contents = await transaction.execute(sa.select(book))
+    book_contents = book_contents.all()
+    assert len(book_contents) == 1
 
-    # book1_exp = res.pop()
-    # assert book1_exp.id == book1.id
-    # assert book1_exp.name == book1.name
-    # assert book1_exp.author_id == book1.author_id
+    patch_data = BookPatchForm(id=book1.id)
+    l = BookDeleteQ(patch_data)
+    await l.delete(transaction)
 
-    # params = BookQueryParams(author_name_contains="author")
-    # l = BookListQ(where=params)
-    # res = await l.list(transaction)
-    # assert len(res) == 1
-
-    # id_params = query.IdFilter(id_=book1.id, tablename="book")
-    # dq = BookDetailQ(where=id_params)
-    # res = await dq.detail(transaction)
-
-    # assert res.id == book1.id
-    # assert res.name == book1.name
-    # assert res.author_id == book1.author_id
+    book_contents = await transaction.execute(sa.select(book))
+    book_contents = book_contents.all()
+    assert len(book_contents) == 0
 
     await transaction.rollback()

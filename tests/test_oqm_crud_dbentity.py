@@ -25,10 +25,16 @@ class BookPatchForm:
 
 
 @dataclasses.dataclass
+class BookDeleteForm:
+    id: int
+
+
+@dataclasses.dataclass
 class BookDBEntity(
     dbentity.Queryable,
     dbentity.Insertable[BookForm],
     dbentity.Updateable[BookPatchForm],
+    dbentity.Deleteable[BookDeleteForm],
 ):
     id: int = 0  # NOTE tinbot I'm making us require to name an id field like any other in child.
     author_id: int = 0
@@ -81,6 +87,14 @@ class BookDBEntity(
         return stmt
 
     @classmethod
+    def delete_stmt(
+        cls, transaction: dal.TransactionManager, data: BookDeleteForm
+    ) -> sa.Delete:
+        t = transaction.get_table("book")
+        stmt = sa.delete(t).where(t.c.id == data.id).returning(t)
+        return stmt
+
+    @classmethod
     def table(cls, transaction: dal.TransactionManager) -> sa.Table:
         return transaction.get_table("book")
 
@@ -129,8 +143,13 @@ class BookInsertQ(query.InsertQ[BookDBEntity, BookForm]):
     __db_obj__ = BookDBEntity
 
 
+class BookDeleteQ(query.DeleteQ[BookDBEntity, BookDeleteForm]):
+    __db_obj__ = BookDBEntity
+
+
 async def test_dbentity_create_read_update(transaction):
     author = transaction.get_table("author")
+    book = transaction.get_table("book")
 
     stmt = sa.insert(author).values(**{"name": "author1"}).returning(author)
     result = await transaction.execute(stmt)
@@ -166,5 +185,16 @@ async def test_dbentity_create_read_update(transaction):
     updated_book = await update_q.update(transaction)
     assert updated_book.name == book_inserted.name
     assert updated_book.extra["extra"] == "rice"
+
+    # delete
+    delete_data = BookDeleteForm(id=book_inserted.id)
+    delete_q = BookDeleteQ(data=delete_data)
+    deleted_book = await delete_q.delete(transaction)
+    assert deleted_book.name == "Lord of the Tables"
+    assert deleted_book.extra == {"extra": "rice"}
+    total_table_result = await transaction.execute(sa.select(book))
+    assert (
+        total_table_result.one_or_none() == None
+    )  # Book table should be empty at this point
 
     await transaction.rollback()

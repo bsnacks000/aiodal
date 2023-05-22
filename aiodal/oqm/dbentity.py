@@ -31,6 +31,17 @@ class Queryable(Constructable):
         ...
 
 
+class Deleteable(Constructable, Generic[FormDataT]):
+    """Enable a dbentity to be deleteable"""
+
+    @classmethod
+    @abc.abstractmethod
+    def delete_stmt(
+        cls, transaction: dal.TransactionManager, data: FormDataT
+    ) -> sa.Delete:
+        ...
+
+
 class Insertable(Constructable, Generic[FormDataT]):
     """enable a dbentity to be writable; takes a pydantic BaseForm model, which contains data to be inserted into db."""
 
@@ -58,5 +69,6 @@ class Updateable(Constructable, Generic[FormDataT]):
 
 _T = Any
 QueryableT = TypeVar("QueryableT", bound=Queryable)
+DeleteableT = TypeVar("DeleteableT", bound=Deleteable[_T])
 InsertableT = TypeVar("InsertableT", bound=Insertable[_T])
 UpdateableT = TypeVar("UpdateableT", bound=Updateable[_T])

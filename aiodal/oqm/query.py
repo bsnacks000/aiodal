@@ -5,6 +5,7 @@ from .dbentity import (
     QueryableT,
     InsertableT,
     UpdateableT,
+    DeleteableT,
     FormDataT,
     DBEntityT,
 )
@@ -41,6 +42,12 @@ class IInsertQ(abc.ABC, Generic[DBEntityT]):
 class IUpdateQ(abc.ABC, Generic[DBEntityT]):
     @abc.abstractmethod
     async def update(self, t: dal.TransactionManager) -> DBEntityT:
+        ...
+
+
+class IDeleteQ(abc.ABC, Generic[DBEntityT]):
+    @abc.abstractmethod
+    async def delete(self, t: dal.TransactionManager) -> DBEntityT:
         ...
 
 
@@ -83,6 +90,28 @@ class BaseInsertQ(abc.ABC, Generic[InsertableT, FormDataT]):
     async def _execute(self, t: dal.TransactionManager) -> sa.CursorResult[Any]:
         stmt = self._db_obj.insert_stmt(t, self.data)
         return await t.execute(stmt)
+
+
+class BaseDeleteQ(abc.ABC, Generic[DeleteableT, FormDataT]):
+    """Base Delete class that constructs delete stmt from DBEntity.delete.stmt and executes it"""
+
+    __db_obj__: Type[DeleteableT]
+
+    def __init__(self, data: FormDataT) -> None:
+        self.data = data
+
+    @property
+    def _db_obj(self) -> Type[DeleteableT]:
+        return self.__class__.__db_obj__
+
+    def _prepare_stmt(self, transaction: dal.TransactionManager) -> sa.Delete:
+        return self.__db_obj__.delete_stmt(transaction, self.data)
+
+    async def _execute(
+        self,
+        t: dal.TransactionManager,
+    ) -> sa.CursorResult[Any]:
+        return await t.execute(self._prepare_stmt(t))
 
 
 class BaseUpdateQ(abc.ABC, Generic[UpdateableT, FormDataT]):
@@ -197,6 +226,15 @@ class UpdateQ(
     """
 
     async def update(self, t: dal.TransactionManager) -> UpdateableT:
+        result = await self._execute(t)
+        r = result.one()
+        return self._db_obj(**r._mapping)
+
+
+class DeleteQ(IDeleteQ[DeleteableT], BaseDeleteQ[DeleteableT, FormDataT]):
+    """Public facing class to delete deletable DBEntities. Returns nothing for now"""
+
+    async def delete(self, t: dal.TransactionManager) -> DeleteableT:
         result = await self._execute(t)
         r = result.one()
         return self._db_obj(**r._mapping)

@@ -190,7 +190,7 @@ class TransactionManager(object):
             return alias
 
     def get_table(self, name: str) -> sa.Table:
-        """Get a table or view from the dal or from an alias set via `set_aliased`.
+        """Get a table or view from the dal.
 
         Args:
             name (str): The name to use for lookup. This should be the name defined in the database.
@@ -198,7 +198,6 @@ class TransactionManager(object):
         Returns:
             sa.Table: The Table.
         """
-
         return self._db.get_table(name)
 
     def get_unique_constraint(self, tablename: str) -> List[str]:

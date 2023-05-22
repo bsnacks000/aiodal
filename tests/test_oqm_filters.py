@@ -66,7 +66,7 @@ class BookQueryParams(filters.Filter):
         self.offset = offset
         self.limit = limit
         self.name = name
-        self.author_name = author_name
+        self.author_name_contains = author_name  # NOTE correct attr set here...
         self.id__ge = id__ge
         self.id__le = id__le
         self.id__gt = id__gt
@@ -81,6 +81,18 @@ class BookQueryParams(filters.Filter):
             filters.WhereLE("book", "id", "id__le"),
             filters.WhereLT("book", "id", "id__lt"),
         ]
+    )
+
+
+class SuperBrokenBookQueryParams(BookQueryParams):
+    __filterset__ = filters.FilterSet(
+        [filters.WhereEquals("fail_1", "fail_2", "fail_3")]
+    )
+
+
+class TableLookupErrorQueryParams(BookQueryParams):
+    __filterset__ = filters.FilterSet(
+        [filters.WhereEquals("fail", "name", "author_name_contains")]
     )
 
 
@@ -128,5 +140,25 @@ async def test_filters_wheres(transaction):
     l = BookListQ(where=params)
     res = await l.list(transaction)
     assert len(res) == 7  # 4,5,6, 7,8,9,10
+
+    await transaction.rollback()
+
+
+async def test_filters_keyerror(transaction):
+    # with pytest.raises(filters.TableLookupError):
+    # should key error since the tablename is not found in alias or reflect
+    with pytest.raises(filters.TableLookupError):
+        params = TableLookupErrorQueryParams(author_name="hi")
+        l = BookListQ(where=params)
+        await l.list(transaction)
+    await transaction.rollback()
+
+
+async def test_filters_attributeerr(transaction):
+    with pytest.raises(AttributeError):
+        # fail_3 throws since there since getattr fails in line 131
+        params = SuperBrokenBookQueryParams()
+        l = BookListQ(where=params)
+        await l.list(transaction)
 
     await transaction.rollback()

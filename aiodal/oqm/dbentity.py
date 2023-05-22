@@ -28,7 +28,7 @@ class Queryable(Constructable):
         cls,
         transaction: dal.TransactionManager,
     ) -> sa.Select[Any]:
-        ...
+        ...  # pragma: no cover
 
 
 class Deleteable(Constructable, Generic[FormDataT]):
@@ -39,7 +39,7 @@ class Deleteable(Constructable, Generic[FormDataT]):
     def delete_stmt(
         cls, transaction: dal.TransactionManager, data: FormDataT
     ) -> sa.Delete:
-        ...
+        ...  # pragma: no cover
 
 
 class Insertable(Constructable, Generic[FormDataT]):
@@ -50,7 +50,7 @@ class Insertable(Constructable, Generic[FormDataT]):
     def insert_stmt(
         cls, transaction: dal.TransactionManager, data: FormDataT
     ) -> sa.Insert:
-        ...
+        ...  # pragma: no cover
 
 
 class Updateable(Constructable, Generic[FormDataT]):
@@ -64,7 +64,7 @@ class Updateable(Constructable, Generic[FormDataT]):
         transaction: dal.TransactionManager,
         data: FormDataT,
     ) -> sa.Update:
-        ...
+        ...  # pragma: no cover
 
 
 _T = Any

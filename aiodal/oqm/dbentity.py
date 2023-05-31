@@ -1,7 +1,7 @@
 """ These are stubs and mixins that form the backbone of `oqm`. We use 2 generic constructs: A DBEntityT is any representation that 
 comes from the database. A FormDataT is any input that can be inserted or updated in the database.
 """
-from typing import TypeVar, Generic, Any, Protocol, TypeAlias
+from typing import TypeVar, Generic, Any, Protocol, TypeAlias, Optional
 import abc
 from aiodal import dal
 import sqlalchemy as sa
@@ -13,7 +13,7 @@ DBEntityT = TypeVar(
     "DBEntityT"
 )  # generic T repr a database entity (table / result of query)
 FormDataT = TypeVar("FormDataT")  # generic T used to handle form data
-
+FilterDataT = TypeVar("FilterDataT")
 _T = Any
 
 SaReturningDelete: TypeAlias = ReturningDelete[_T]
@@ -34,9 +34,15 @@ class Queryable(Constructable):
 
     @classmethod
     @abc.abstractmethod
+    def query_stmt(cls, transaction: dal.TransactionManager) -> SaSelect:
+        ...  # pragma: no cover
+
+
+class WhereQueryable(Constructable, Generic[FilterDataT]):
+    @classmethod
+    @abc.abstractmethod
     def query_stmt(
-        cls,
-        transaction: dal.TransactionManager,
+        cls, transaction: dal.TransactionManager, where: Optional[FilterDataT] = None
     ) -> SaSelect:
         ...  # pragma: no cover
 
@@ -78,6 +84,7 @@ class Updateable(Constructable, Generic[FormDataT]):
 
 
 QueryableT = TypeVar("QueryableT", bound=Queryable)
+WhereQueryableT = TypeVar("WhereQueryableT", bound=WhereQueryable[_T])
 DeleteableT = TypeVar("DeleteableT", bound=Deleteable[_T])
 InsertableT = TypeVar("InsertableT", bound=Insertable[_T])
 UpdateableT = TypeVar("UpdateableT", bound=Updateable[_T])

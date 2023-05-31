@@ -1,7 +1,7 @@
 import pytest
 import pathlib
 import aiodal
-import toml
+import toml  # type: ignore
 
 
 def test_pyproject_version_sync():

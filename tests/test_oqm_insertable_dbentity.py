@@ -27,7 +27,7 @@ class InsertableBookDBEntity(dbentity.Insertable[BookForm]):
     @classmethod
     def insert_stmt(
         cls, transaction: dal.TransactionManager, data: BookForm
-    ) -> sa.Insert:
+    ) -> dbentity.ReturningInsert:
         t = transaction.get_table("book")
         author_table = transaction.get_table("author")
         author_id_subq = (

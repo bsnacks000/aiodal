@@ -8,6 +8,10 @@ from .dbentity import (
     DeleteableT,
     FormDataT,
     DBEntityT,
+    SaSelect,
+    SaReturningUpdate,
+    SaReturningDelete,
+    SaReturningInsert,
 )
 from .filters import (
     FilterStmtT,
@@ -65,14 +69,13 @@ class BaseQ(abc.ABC, Generic[QueryableT, FilterStmtT]):
     def _db_obj(self) -> Type[QueryableT]:
         return self.__class__.__db_obj__
 
-    def _prepare_stmt(self, transaction: dal.TransactionManager) -> sa.Select[Any]:
+    def _prepare_stmt(self, transaction: dal.TransactionManager) -> SaSelect:
         stmt = self._db_obj.query_stmt(transaction)
         stmt = self.where.filter_stmt(transaction, stmt)
         return stmt
 
     async def _execute(self, t: dal.TransactionManager) -> sa.CursorResult[Any]:
-        stmt = self._prepare_stmt(t)
-        return await t.execute(stmt)
+        return await t.execute(self._prepare_stmt(t))
 
 
 class BaseInsertQ(abc.ABC, Generic[InsertableT, FormDataT]):
@@ -87,9 +90,11 @@ class BaseInsertQ(abc.ABC, Generic[InsertableT, FormDataT]):
     def _db_obj(self) -> Type[InsertableT]:
         return self.__class__.__db_obj__
 
+    def _prepare_stmt(self, t: dal.TransactionManager) -> SaReturningInsert:
+        return self._db_obj.insert_stmt(t, self.data)
+
     async def _execute(self, t: dal.TransactionManager) -> sa.CursorResult[Any]:
-        stmt = self._db_obj.insert_stmt(t, self.data)
-        return await t.execute(stmt)
+        return await t.execute(self._prepare_stmt(t))
 
 
 class BaseDeleteQ(abc.ABC, Generic[DeleteableT, FormDataT]):
@@ -104,13 +109,10 @@ class BaseDeleteQ(abc.ABC, Generic[DeleteableT, FormDataT]):
     def _db_obj(self) -> Type[DeleteableT]:
         return self.__class__.__db_obj__
 
-    def _prepare_stmt(self, transaction: dal.TransactionManager) -> sa.Delete:
-        return self.__db_obj__.delete_stmt(transaction, self.data)
+    def _prepare_stmt(self, t: dal.TransactionManager) -> SaReturningDelete:
+        return self.__db_obj__.delete_stmt(t, self.data)
 
-    async def _execute(
-        self,
-        t: dal.TransactionManager,
-    ) -> sa.CursorResult[Any]:
+    async def _execute(self, t: dal.TransactionManager) -> sa.CursorResult[Any]:
         return await t.execute(self._prepare_stmt(t))
 
 
@@ -128,8 +130,8 @@ class BaseUpdateQ(abc.ABC, Generic[UpdateableT, FormDataT]):
     def _db_obj(self) -> Type[UpdateableT]:
         return self.__class__.__db_obj__
 
-    def _prepare_stmt(self, transaction: dal.TransactionManager) -> sa.Update:
-        return self._db_obj.update_stmt(transaction, self.data)
+    def _prepare_stmt(self, t: dal.TransactionManager) -> SaReturningUpdate:
+        return self._db_obj.update_stmt(t, self.data)
 
     async def _execute(self, t: dal.TransactionManager) -> sa.CursorResult[Any]:
         return await t.execute(self._prepare_stmt(t))

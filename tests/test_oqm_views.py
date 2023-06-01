@@ -209,8 +209,7 @@ async def test_update_view_query_exception(transaction, mocker):
 
     with pytest.raises(views.AiodalHTTPException):
         q = BookUpdateQ(MockBookForm())
-        response = await views.UpdateViewQuery.from_query(transaction, q)
-        assert isinstance(response.obj, MockBook)
+        await views.UpdateViewQuery.from_query(transaction, q)
 
 
 async def test_delete_view_query_result(transaction, mocker):
@@ -232,8 +231,7 @@ async def test_delete_view_query_exception(transaction, mocker):
 
     with pytest.raises(views.AiodalHTTPException):
         q = BookDeleteQ(MockBookForm())
-        response = await views.DeleteViewQuery.from_query(transaction, q)
-        assert isinstance(response.obj, MockBook)
+        await views.DeleteViewQuery.from_query(transaction, q)
 
 
 async def test_insert_view_query_result(transaction, mocker):
@@ -255,5 +253,4 @@ async def test_insert_view_query_exception(transaction, mocker):
 
     with pytest.raises(views.AiodalHTTPException):
         q = BookInsertQ(MockBookForm())
-        response = await views.InsertViewQuery.from_query(transaction, q)
-        assert isinstance(response.obj, MockBook)
+        await views.InsertViewQuery.from_query(transaction, q)

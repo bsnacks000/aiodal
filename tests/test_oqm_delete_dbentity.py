@@ -32,10 +32,6 @@ class DeleteableBookDBEntity(dbentity.Deleteable[BookPatchForm]):
         t = transaction.get_table("book")
         return sa.delete(t).where(t.c.id == data.id).returning(t)
 
-    @classmethod
-    def table(cls, transaction: dal.TransactionManager) -> sa.Table:
-        return transaction.get_table("book")
-
 
 class BookDeleteQ(query.DeleteQ[DeleteableBookDBEntity, BookPatchForm]):
     __db_obj__ = DeleteableBookDBEntity

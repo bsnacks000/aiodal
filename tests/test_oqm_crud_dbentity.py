@@ -94,10 +94,6 @@ class BookDBEntity(
         stmt = sa.delete(t).where(t.c.id == data.id).returning(t)
         return stmt
 
-    @classmethod
-    def table(cls, transaction: dal.TransactionManager) -> sa.Table:
-        return transaction.get_table("book")
-
 
 # NOTE It is fine to query
 class BookQueryParams(filters.Filter):

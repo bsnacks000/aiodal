@@ -99,11 +99,6 @@ class BookDBEntity(
         return transaction.get_table("book")
 
 
-# XXX @tinbot ... this does not actually make sense... We should not be updating
-# an Author from a Book update... we should not really be using FilterSet to update
-# data, just the user Id and the FormData
-
-
 # NOTE It is fine to query
 class BookQueryParams(filters.Filter):
     def __init__(

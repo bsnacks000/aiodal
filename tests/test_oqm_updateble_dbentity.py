@@ -30,7 +30,7 @@ class UpdateableBookDBEntity(dbentity.Updateable[BookPatchForm]):
     @classmethod
     def update_stmt(
         cls, transaction: dal.TransactionManager, data: BookPatchForm
-    ) -> sa.Update:
+    ) -> dbentity.ReturningUpdate:
         t = transaction.get_table("book")
 
         stmt = (

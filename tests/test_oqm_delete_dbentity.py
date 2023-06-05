@@ -28,13 +28,9 @@ class DeleteableBookDBEntity(dbentity.Deleteable[BookPatchForm]):
     @classmethod
     def delete_stmt(
         cls, transaction: dal.TransactionManager, data: BookPatchForm
-    ) -> sa.Delete:
+    ) -> dbentity.ReturningDelete:
         t = transaction.get_table("book")
         return sa.delete(t).where(t.c.id == data.id).returning(t)
-
-    @classmethod
-    def table(cls, transaction: dal.TransactionManager) -> sa.Table:
-        return transaction.get_table("book")
 
 
 class BookDeleteQ(query.DeleteQ[DeleteableBookDBEntity, BookPatchForm]):

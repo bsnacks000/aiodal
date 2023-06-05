@@ -51,7 +51,7 @@ class BookDBEntity(
     @classmethod
     def insert_stmt(
         cls, transaction: dal.TransactionManager, data: BookForm
-    ) -> sa.Insert:
+    ) -> dbentity.SaReturningInsert:
         t = transaction.get_table("book")
         author_table = transaction.get_table("author")
         author_id_subq = (
@@ -74,7 +74,7 @@ class BookDBEntity(
     @classmethod
     def update_stmt(
         cls, transaction: dal.TransactionManager, data: BookPatchForm
-    ) -> sa.Update:
+    ) -> dbentity.SaReturningUpdate:
         t = transaction.get_table("book")
         stmt = (
             sa.update(t)
@@ -89,19 +89,10 @@ class BookDBEntity(
     @classmethod
     def delete_stmt(
         cls, transaction: dal.TransactionManager, data: BookDeleteForm
-    ) -> sa.Delete:
+    ) -> dbentity.SaReturningDelete:
         t = transaction.get_table("book")
         stmt = sa.delete(t).where(t.c.id == data.id).returning(t)
         return stmt
-
-    @classmethod
-    def table(cls, transaction: dal.TransactionManager) -> sa.Table:
-        return transaction.get_table("book")
-
-
-# XXX @tinbot ... this does not actually make sense... We should not be updating
-# an Author from a Book update... we should not really be using FilterSet to update
-# data, just the user Id and the FormData
 
 
 # NOTE It is fine to query

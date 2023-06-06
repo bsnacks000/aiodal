@@ -1,4 +1,4 @@
-from aiodal.oqm import query, filters, dbentity
+from aiodal.oqm import query, dbentity
 from aiodal import dal
 import sqlalchemy as sa
 from typing import Any, Optional, Dict

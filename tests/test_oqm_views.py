@@ -6,7 +6,6 @@ import dataclasses
 import pytest
 
 from aiodal.oqm.views import Paginateable
-from aiodal.helpers import sa_total_count
 
 pytestmark = pytest.mark.anyio
 

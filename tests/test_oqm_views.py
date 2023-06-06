@@ -167,6 +167,12 @@ async def test_list_view_empty(transaction, mocker):
     assert len(response.results) == 0
 
 
+async def test_list_view_with_where_list_query(transaction, mocker): 
+
+    async def mocked_list
+
+
+
 async def test_detail_view_query_result(transaction, mocker):
     async def mocked_detail(cls_, transaction):
         return MockBook()

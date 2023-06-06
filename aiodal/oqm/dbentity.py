@@ -35,7 +35,7 @@ class Queryable(Constructable, Generic[FilterDataT]):
     @classmethod
     @abc.abstractmethod
     def query_stmt(
-        cls, transaction: dal.TransactionManager, where: Optional[FilterDataT] = None
+        cls, transaction: dal.TransactionManager, where: FilterDataT
     ) -> SaSelect:
         ...  # pragma: no cover
 

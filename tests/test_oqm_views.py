@@ -1,7 +1,7 @@
-from aiodal.oqm import query, filters, dbentity, views
+from aiodal.oqm import query, dbentity, views
 from aiodal import dal
-import sqlalchemy as sa
-from typing import Any, Optional, Dict
+
+from typing import Any
 import dataclasses
 import pytest
 
@@ -66,7 +66,7 @@ async def test_default_paginator():
     assert x == "/v1/book/?offset=150&limit=100"
 
 
-class MockBookQueryParams(filters.Filter):
+class MockBookQueryParams:
     ...
 
 
@@ -115,7 +115,7 @@ class BookListQ(query.ListQ[MockBook, MockBookQueryParams]):
     __db_obj__ = MockBook
 
 
-class BookDetailQ(query.DetailQ[MockBook]):
+class BookDetailQ(query.DetailQ[MockBook, MockBookQueryParams]):
     __db_obj__ = MockBook
 
 
@@ -165,12 +165,6 @@ async def test_list_view_empty(transaction, mocker):
     )
     assert response.next_url is None
     assert len(response.results) == 0
-
-
-async def test_list_view_with_where_list_query(transaction, mocker): 
-
-    async def mocked_list
-
 
 
 async def test_detail_view_query_result(transaction, mocker):

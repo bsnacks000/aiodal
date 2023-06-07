@@ -27,22 +27,15 @@ class Constructable(Protocol):
         ...
 
 
-class Queryable(Constructable):
+class Queryable(Constructable, Generic[FilterDataT]):
     """enable a dbentity to be readable/query-able; works with QueryParamsModel which
     adds additonal where stmt to the output from query_stmt
     """
 
     @classmethod
     @abc.abstractmethod
-    def query_stmt(cls, transaction: dal.TransactionManager) -> SaSelect:
-        ...  # pragma: no cover
-
-
-class WhereQueryable(Constructable, Generic[FilterDataT]):
-    @classmethod
-    @abc.abstractmethod
     def query_stmt(
-        cls, transaction: dal.TransactionManager, where: Optional[FilterDataT] = None
+        cls, transaction: dal.TransactionManager, where: FilterDataT
     ) -> SaSelect:
         ...  # pragma: no cover
 
@@ -83,8 +76,7 @@ class Updateable(Constructable, Generic[FormDataT]):
         ...  # pragma: no cover
 
 
-QueryableT = TypeVar("QueryableT", bound=Queryable)
-WhereQueryableT = TypeVar("WhereQueryableT", bound=WhereQueryable[_T])
+QueryableT = TypeVar("QueryableT", bound=Queryable[_T])
 DeleteableT = TypeVar("DeleteableT", bound=Deleteable[_T])
 InsertableT = TypeVar("InsertableT", bound=Insertable[_T])
 UpdateableT = TypeVar("UpdateableT", bound=Updateable[_T])

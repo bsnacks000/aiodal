@@ -1,4 +1,4 @@
-from aiodal.oqm import query, filters, dbentity
+from aiodal.oqm import query, dbentity
 from aiodal import dal
 import sqlalchemy as sa
 from typing import Any, Optional
@@ -8,9 +8,25 @@ import pytest
 pytestmark = pytest.mark.anyio
 
 
+class BookQueryParams:
+    def __init__(
+        self,
+        name: Optional[str] = "",
+        offset: int = 0,
+        limit: int = 1000,
+    ):
+        self.offset = offset
+        self.limit = limit
+        self.name = name
+
+
+class IdFilter:
+    def __init__(self, id: int):
+        self.id = id
+
+
 @dataclasses.dataclass
-class ReadableBookDBEntity(dbentity.Queryable):
-    # id: int = 0 <-- inherit from DBEntity, parent of TableDBEntity
+class BookDBEntityData:
     id: int = 0
     author_id: int = 0
     author_name: str = ""
@@ -18,8 +34,13 @@ class ReadableBookDBEntity(dbentity.Queryable):
     catalog: str = ""
     extra: dict[str, Any] = dataclasses.field(default_factory=lambda: {})
 
+
+@dataclasses.dataclass
+class ReadableBookDBEntity(BookDBEntityData, dbentity.Queryable[BookQueryParams]):
     @classmethod
-    def query_stmt(cls, transaction: dal.TransactionManager) -> sa.Select[Any]:
+    def query_stmt(
+        cls, transaction: dal.TransactionManager, where: BookQueryParams
+    ) -> sa.Select[Any]:
         t = transaction.get_table("book")
         u = transaction.get_table("author")
         stmt = (
@@ -30,28 +51,14 @@ class ReadableBookDBEntity(dbentity.Queryable):
         return stmt
 
 
-class BookQueryParams(filters.Filter):
-    def __init__(
-        self,
-        name: Optional[str] = "",
-        author_name: Optional[str] = "",
-        author_name_contains: Optional[str] = "",
-        offset: int = 0,
-        limit: int = 1000,
-    ):
-        self.offset = offset
-        self.limit = limit
-        self.name = name
-        self.author_name = author_name
-        self.author_name_contains = author_name_contains
-
-    __filterset__ = filters.FilterSet(
-        [
-            filters.WhereEquals("book", "name", "name"),
-            filters.WhereEquals("author", "name", "author_name"),
-            filters.WhereContains("author", "name", "author_name_contains"),
-        ]
-    )
+@dataclasses.dataclass
+class DetailBookDBEntity(BookDBEntityData, dbentity.Queryable[IdFilter]):
+    @classmethod
+    def query_stmt(
+        cls, transaction: dal.TransactionManager, where: IdFilter
+    ) -> sa.Select[Any]:
+        t = transaction.get_table("book")
+        return sa.select(t).where(t.c.id == where.id)
 
 
 class BookListQ(
@@ -60,7 +67,7 @@ class BookListQ(
     __db_obj__ = ReadableBookDBEntity
 
 
-class BookDetailQ(query.DetailQ[ReadableBookDBEntity]):
+class BookDetailQ(query.DetailQ[ReadableBookDBEntity, BookQueryParams]):
     __db_obj__ = ReadableBookDBEntity
 
 
@@ -92,12 +99,7 @@ async def test_dbentity_query_stmt(transaction):
     assert book1_exp.name == book1.name
     assert book1_exp.author_id == book1.author_id
 
-    params = BookQueryParams(author_name_contains="author")
-    l = BookListQ(where=params)
-    res = await l.list(transaction)
-    assert len(res) == 1
-
-    id_params = query.IdFilter(id_=book1.id, tablename="book")
+    id_params = IdFilter(id=book1.id)
     dq = BookDetailQ(where=id_params)
     res = await dq.detail(transaction)
 

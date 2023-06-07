@@ -8,10 +8,9 @@ from aiodal.oqm.dbentity import (
     UpdateableT,
     Queryable,
     DeleteableT,
+    FilterDataT,
 )
-from .query import ListQ, DetailQ, UpdateQ, InsertQ, DeleteQ
-from .dbentity import FormDataT
-from .filters import Filter, FilterT
+from .query import IListQ, IDetailQ, IUpdateQ, IInsertQ, IDeleteQ
 
 from sqlalchemy.exc import NoResultFound, IntegrityError
 import dataclasses
@@ -43,11 +42,11 @@ class AiodalHTTPException(Exception):
         return f"{class_name}(status_code={self.status_code!r}, detail={self.detail!r})"
 
 
-class Paginateable(Queryable, abc.ABC):
+class Paginateable(Queryable[FilterDataT], abc.ABC):
     total_count: int
 
 
-PaginateableT = TypeVar("PaginateableT", bound=Paginateable)
+PaginateableT = TypeVar("PaginateableT", bound=Paginateable[object])
 
 
 def _default_paginator(
@@ -82,7 +81,7 @@ def _default_paginator(
 
 
 @dataclasses.dataclass
-class ListViewQuery(Generic[PaginateableT, FilterT]):
+class ListViewQuery(Generic[PaginateableT]):
     next_url: Optional[str]
     results: Sequence[PaginateableT]
 
@@ -112,9 +111,9 @@ class ListViewQuery(Generic[PaginateableT, FilterT]):
         request_url: str,
         offset: int,
         limit: int,
-        listq: ListQ[PaginateableT, FilterT],
+        listq: IListQ[PaginateableT],
         url_start_index: Optional[str] = None,
-    ) -> "ListViewQuery[PaginateableT, FilterT]":
+    ) -> "ListViewQuery[PaginateableT]":
         results = await listq.list(transaction)
         next_url = cls._paginator(request_url, offset, limit, results, url_start_index)
         return cls(next_url=next_url, results=results)
@@ -128,7 +127,7 @@ class DetailViewQuery(Generic[QueryableT]):
     async def from_query(
         cls,
         transaction: dal.TransactionManager,
-        detailq: DetailQ[QueryableT],
+        detailq: IDetailQ[QueryableT],
     ) -> "DetailViewQuery[QueryableT]":
         try:
             obj = await detailq.detail(transaction)
@@ -138,15 +137,15 @@ class DetailViewQuery(Generic[QueryableT]):
 
 
 @dataclasses.dataclass
-class InsertViewQuery(Generic[InsertableT, FormDataT]):
+class InsertViewQuery(Generic[InsertableT]):
     obj: InsertableT
 
     @classmethod
     async def from_query(
         cls,
         transaction: dal.TransactionManager,
-        insertq: InsertQ[InsertableT, FormDataT],
-    ) -> "InsertViewQuery[InsertableT, FormDataT]":
+        insertq: IInsertQ[InsertableT],
+    ) -> "InsertViewQuery[InsertableT]":
         try:
             obj = await insertq.insert(transaction)
             return cls(obj=obj)
@@ -166,13 +165,13 @@ class InsertViewQuery(Generic[InsertableT, FormDataT]):
 
 
 @dataclasses.dataclass
-class CreateOrUpdateQuery(InsertViewQuery[InsertableT, FormDataT]):
+class CreateOrUpdateQuery(InsertViewQuery[InsertableT]):
     @classmethod
     async def from_query(
         cls,
         transaction: dal.TransactionManager,
-        insertq: InsertQ[InsertableT, FormDataT],
-    ) -> "InsertViewQuery[InsertableT, FormDataT]":
+        insertq: IInsertQ[InsertableT],
+    ) -> "InsertViewQuery[InsertableT]":
         try:
             obj = await insertq.insert(transaction)
             return cls(obj=obj)
@@ -181,15 +180,15 @@ class CreateOrUpdateQuery(InsertViewQuery[InsertableT, FormDataT]):
 
 
 @dataclasses.dataclass
-class UpdateViewQuery(Generic[UpdateableT, FormDataT]):
+class UpdateViewQuery(Generic[UpdateableT]):
     obj: UpdateableT
 
     @classmethod
     async def from_query(
         cls,
         transaction: dal.TransactionManager,
-        updateq: UpdateQ[UpdateableT, FormDataT],
-    ) -> "UpdateViewQuery[UpdateableT, FormDataT]":
+        updateq: IUpdateQ[UpdateableT],
+    ) -> "UpdateViewQuery[UpdateableT]":
         try:
             obj = await updateq.update(transaction)  # call update here
             return cls(obj=obj)
@@ -198,15 +197,15 @@ class UpdateViewQuery(Generic[UpdateableT, FormDataT]):
 
 
 @dataclasses.dataclass
-class DeleteViewQuery(Generic[DeleteableT, FormDataT]):
+class DeleteViewQuery(Generic[DeleteableT]):
     obj: DeleteableT
 
     @classmethod
     async def from_query(
         cls,
         transaction: dal.TransactionManager,
-        deleteq: DeleteQ[DeleteableT, FormDataT],
-    ) -> "DeleteViewQuery[DeleteableT, FormDataT]":
+        deleteq: IDeleteQ[DeleteableT],
+    ) -> "DeleteViewQuery[DeleteableT]":
         try:
             obj = await deleteq.delete(transaction)
             return cls(obj=obj)

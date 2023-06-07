@@ -56,16 +56,26 @@ This give you access to an active `transaction` fixture that you can pass around
 
 We have a small framework for mapping _custom queries_ and related CRUD ops to python objects. It is implemented as a set of mixins and base classes that can be configured in declarative style similar to django or sqlalchemy.orm.
 
+The core mixins are found in `oqm.query` and `oqm.dbentity`. 
+
 In minimum, a `DBEntityT` should implement `Queryable` mixin that returns the represented data from the db. This doesn't neccessarily need to map to a complete table but it can... In these cases we can easily get similar django-like ORM behavior by implementing the other Mixins.
 
+The `oqm` package provides a concrete API with these mixins that can be used to create list views and CRUD on single objects out of the box. 
 
-### DBEntities and simple Querying
+### Queryable
 
-Using a dataclass here is nice for speed and that it saves some time, but you can use any object here.
+We can use Queryable to create a list view out of an arbitrary `sqlalchemy.core` style query with dynamic runtime where clause. 
 
 ```python
+
+class BookQueryParams:
+    def __init__(self, name: str): 
+        self.name = name
+
+
+
 @dataclasses.dataclass
-class Book(dbentity.Queryable):
+class BookList(dbentity.Queryable[BookQueryParams]):
     id: int = 0 
     author_id: int = 0
     name: str = ""
@@ -73,54 +83,14 @@ class Book(dbentity.Queryable):
     extra: dict[str, Any] = dataclasses.field(default_factory=lambda: {})
 
     @classmethod
-    def query_stmt(cls, transaction: dal.TransactionManager) -> SaSelect:
+    def query_stmt(cls, transaction: dal.TransactionManager, where: BookQueryParams) -> SaSelect:
         t = transaction.get_table("book")
-        stmt = sa.select(t).order_by(t.c.id)  # type: ignore
+        stmt = sa.select(t).where( t.c.name == where.name).order_by(t.c.id)
         return stmt
-```
 
 
-### List View + Filtering
-To construct a list view of `book` table, we can use `ListQ(IListQ[QueryableT], BaseQ[QueryableT, FilterT])` which takes a `TableDBEntity` and 
-a `Filter`.
-
-We can build `BookQueryParams` that can be used to query on `book.name` and `author.name` as follows
-
-```python
-from aiodal.oqm import filters
-
-class BookQueryParams(filters.Filter):
-    def __init__(
-        self,
-        name: Optional[str] = "",
-        author_name: Optional[str] = "",
-        author_name__contains: Optional[str] = "",
-        offset: int = 0, # Query(0, ge=0) #optionally use fastapi.Query
-        limit: int = 1000, # Query(1000, ge=0, le=1000),
-    ):
-        self.offset = offset
-        self.limit = limit
-        self.name = name
-        self.author_name = author_name
-        self.author_name__contains = author_name__contains
-
-    __filterset__ = filters.FilterSet(
-        [   
-            filters.WhereEquals("book", "name", "name"),
-            filters.WhereEquals("author", "name", "author_name"),
-            filters.WhereContains("author", "name", "author_name__contains"),
-        ]
-    )
-```
-`filters.FilterSet` takes in a list of `WhereFilter` objects: default WhereFilter objs are: `WhereEquals`, `WhereGE`, `WhereLE`, `WhereGT`, `WhereLT`, and `WhereContains`. `WhereFilter` object takes `dbtable_name`, `dbtable_column_name` and `python_param` that correspond to `dbtable_column_name`.
-
-Next we implement a `ListQ` that works with `BookDBEntity` and `BookQueryParams`; note that `ListQ` is instaniated with `QueryParamsModel`.
-```python
-from aiodal import query
-class BookListQ(
-    query.ListQ[Book, BookQueryParams],
-):
-    __db_obj__ = Book
+class BookListQ(query.ListQ[BookList, BookQueryParams]):
+    __db_obj__ = BookList
 
 #in pratice:
 params = BookQueryParams(name="Lord Of the Tables")
@@ -128,34 +98,62 @@ l = BookListQ(where=params)
 book_list = await l.list(transaction) #returns list[TableDBEntityT] --> list[BookDBEntity]
 ```
 
-#### Detail View
-For constructing detail view, we can use `DetailQ(IDetailQ[QueryableT], BaseQ[QueryableT, IdFilter])`. Note that, unlike `ListQ`, `DetailQ` has already
-`IdFilter` which is a subclass of `FilterStatement`, same as `Filter`, so we do not need to provide any other query params model.
-```python
-class BookDetailQ(
-    query.DetailQ[Book]
-):
 
-    __db_obj__ = Book
+### CRUD single objects
+
+We can CRUD single objects useful in context for REST APIs. 
+
+Here another `Queryable` is used to return a detail view using `DetailQ`. This concrete class will call `result.one()` to get the result and raise 
+an error if the object is not found. 
+
+To insert update and delete we inherit from the appropriate abstract class and implement the needed statement. 
+
+Note that these operations are simple in this example but because the db entities do not neccessarily need to be tied to a database table we have flexibilty. 
+For example we can insert and update an object using a CTE. 
+
+In the future we might extend CUD ops to include bulk statements.  
+
+```python
+
+class ObjectId: 
+    def __init__(self, id: int): 
+        self.id = id 
+
+
+@dataclasses.dataclass
+class BookList(dbentity.Queryable[ObjectId]):
+    id: int = 0 
+    author_id: int = 0
+    name: str = ""
+    catalog: str = ""
+    extra: dict[str, Any] = dataclasses.field(default_factory=lambda: {})
+
+    @classmethod
+    def query_stmt(cls, transaction: dal.TransactionManager, where: ObjectId) -> SaSelect:
+        t = transaction.get_table("book")
+        stmt = sa.select(t).where( t.c.id == where.id).order_by(t.c.id)
+        return stmt
+
+
+class BookDetailQ(query.DetailQ[Book]):
+    __db_obj__ = BookDetail
 
 #in pratice:
-id_=1
-id_params = query.IdFilter(id_, tablename="book")
-dq = BookDetailQ(where=id_params)
+obj = ObjectId(1)
+dq = BookDetailQ(where=obj)
 book_detail = await dq.detail(transaction) # --> Book!
 ```
 
 ### Inserting
 
-To make `Book` to be a writable table, we inherit it from `dbentity.Insertable`, with which we implement `insert_stmt` method with relevant business logic to insert data into table in db. `insert_stmt` takes a `transaction` object with connection to db and a form model (we will be using pydantic model).
-
 ```python
-import pydantic
-class BookForm(pydantic.BaseFormModel):
+
+@dataclasses.dataclass
+class BookForm:
     author_name: str
     name: str
     catalog: str
-    extra: Dict[str, Any] = {}
+    
 
 @dataclasses.dataclass
 class BookDBEntity(dbentity.Insertable[BookForm]):
@@ -180,14 +178,10 @@ class BookDBEntity(dbentity.Insertable[BookForm]):
                 catalog=data.catalog,
                 extra=data.extra,
             )
-            .returning(t)
+            .returning(t) # NOTE should use returning in this API
         )
         return stmt
-```
 
-Similarly to `ListQ`, `Insertable` entity works together with `InsertQ` which has `insert` method that execute insert statment generated from `Insertable.insert_stmt`
-
-```python
 class BookInsertQ(query.InsertQ[Book, BookForm]):
     __db_obj__ = Book
 
@@ -200,15 +194,13 @@ inesert_.insert(transaction) # returns BookDBEntity
 
 ### Updating
 
-To make `Book` an updateable table, we inherit it from `dbentity.Updateable`, with which we implement `update_stmt` method with relevant business logic to update a single record. The `update_stmt` method takes a `transaction` object with connection to db. 
-
-
 ```python
 @dataclasses.dataclass
 class BookPatchForm:
     id: int
     catalog: str
     extra: Dict[str, Any] = {}
+
 
 @dataclasses.dataclass
 class BookDBEntity(dbentity.Updateable):
@@ -243,7 +235,7 @@ updated_book = await update_q.update(transaction)
 ```
 
 ### Delete
-Similarly, we can implement delete as follows:
+
 ```python
 
 @dataclasses.dataclass
@@ -260,6 +252,7 @@ class BookDBEntity(dbentity.Deleteable[BookDeleteForm]):
     ) -> dbentity.ReturningDelete:
         t = transaction.get_table("book")
         return sa.delete(t).where(t.c.id == data.id).returning(t)
+
 
 class BookDeleteQ(query.DeleteQ[DeleteableBookDBEntity, BookDeleteForm]):
     __db_obj__ = DeleteableBookDBEntity
@@ -278,7 +271,7 @@ Now, we can build a readable, writable, updateable, and deleteable `DBEntity` as
 ```python
 @dataclasses.dataclass
 class Book(
-    dbentity.Queryable,
+    dbentity.Queryable[BookParams],
     dbentity.Insertable[BookForm],
     dbentity.Updateable[BookPatchForm],
     dbentity.Deleteable[BookDeleteForm],
@@ -286,8 +279,9 @@ class Book(
     ...
 
     @classmethod
-    def query_stmt(cls, transaction: dal.TransactionManager) -> dbentity.SaSelect:
+    def query_stmt(cls, transaction: dal.TransactionManager, where: BookParams) -> dbentity.SaSelect:
         ...
+    
     @classmethod
     def insert_stmt(
         cls, transaction: dal.TransactionManager, data: BookForm
@@ -305,6 +299,3 @@ class Book(
         cls, transaction: dal.TransactionManager, data: BookDeleteForm
     ) -> dbentity.ReturningDelete:
 ```
-
-As of this writing we have not implemented `Delete` but a similar pattern since we do not regularly delete data from our applications but a similar pattern can be used to extend the `oqm` package.
-

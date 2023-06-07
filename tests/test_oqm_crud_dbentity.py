@@ -1,4 +1,4 @@
-from aiodal.oqm import query, filters, dbentity
+from aiodal.oqm import query, dbentity
 from aiodal import dal
 import sqlalchemy as sa
 from typing import Any, Optional, Dict
@@ -29,9 +29,21 @@ class BookDeleteForm:
     id: int
 
 
+class BookQueryParams:
+    def __init__(
+        self,
+        offset: int = 0,
+        limit: int = 1000,
+        name: Optional[str] = None,
+    ):
+        self.offset = offset
+        self.limit = limit
+        self.name = name
+
+
 @dataclasses.dataclass
 class BookDBEntity(
-    dbentity.Queryable,
+    dbentity.Queryable[BookQueryParams],
     dbentity.Insertable[BookForm],
     dbentity.Updateable[BookPatchForm],
     dbentity.Deleteable[BookDeleteForm],
@@ -43,9 +55,18 @@ class BookDBEntity(
     extra: dict[str, Any] = dataclasses.field(default_factory=lambda: {})
 
     @classmethod
-    def query_stmt(cls, transaction: dal.TransactionManager) -> sa.Select[Any]:
+    def query_stmt(
+        cls,
+        transaction: dal.TransactionManager,
+        where: BookQueryParams,
+    ) -> sa.Select[Any]:
         t = transaction.get_table("book")
         stmt = sa.select(t).order_by(t.c.id)  # type: ignore
+
+        if where.name:
+            stmt = stmt.where(t.c.name == where.name)
+
+        stmt = stmt.offset(where.offset).limit(where.limit)
         return stmt
 
     @classmethod
@@ -93,31 +114,6 @@ class BookDBEntity(
         t = transaction.get_table("book")
         stmt = sa.delete(t).where(t.c.id == data.id).returning(t)
         return stmt
-
-
-# NOTE It is fine to query
-class BookQueryParams(filters.Filter):
-    def __init__(
-        self,
-        name: Optional[str] = "",
-        author_name: Optional[str] = "",
-        author_name_contains: Optional[str] = "",
-        offset: int = 0,
-        limit: int = 1000,
-    ):
-        self.offset = offset
-        self.limit = limit
-        self.name = name
-        self.author_name = author_name
-        self.author_name_contains = author_name_contains
-
-    __filterset__ = filters.FilterSet(
-        [
-            filters.WhereEquals("book", "name", "name"),
-            filters.WhereEquals("author", "name", "author_name"),
-            filters.WhereContains("author", "name", "author_name_contains"),
-        ]
-    )
 
 
 class BookListQ(

@@ -148,6 +148,27 @@ async def test_list_view_query(transaction, mocker):
     assert len(response.results) == 100
 
 
+async def test_total_count_list_view_query(transaction, mocker):
+    async def mocked_list(cls_, transaction):
+        return [MockBook(id=i) for i in range(100)]
+
+    mocker.patch.object(BookListQ, "list", mocked_list)
+
+    offset = 0
+    limit = 100
+    url = f"https://mysite.com/v1/book/"
+
+    q = BookListQ(MockBookQueryParams())
+    response = await views.TotalCountListViewQuery.from_query(
+        transaction, url, offset, limit, q, "/v1"
+    )
+    assert response.next_url == "/v1/book/?offset=100&limit=100"
+    assert len(response.results) == 100
+    assert (
+        response.total_count == 200
+    )  # NOTE this is given in total_count in mocked response
+
+
 async def test_list_view_empty(transaction, mocker):
     async def mocked_list(cls_, transaction):
         return []
@@ -164,6 +185,25 @@ async def test_list_view_empty(transaction, mocker):
     )
     assert response.next_url is None
     assert len(response.results) == 0
+
+
+async def test_total_count_list_view_empty(transaction, mocker):
+    async def mocked_list(cls_, transaction):
+        return []
+
+    mocker.patch.object(BookListQ, "list", mocked_list)
+
+    offset = 0
+    limit = 100
+    url = f"https://mysite.com/v1/book/"
+
+    q = BookListQ(MockBookQueryParams())
+    response = await views.TotalCountListViewQuery.from_query(
+        transaction, url, offset, limit, q, "/v1"
+    )
+    assert response.next_url is None
+    assert len(response.results) == 0
+    assert response.total_count == 0
 
 
 async def test_detail_view_query_result(transaction, mocker):

@@ -1,7 +1,7 @@
 """This module provides some convenience for gluing the oqm APIs to the async web framework of your choice.
 """
 
-from typing import Optional, Generic, Sequence, TypeVar, Dict, Any
+from typing import Optional, Generic, Sequence, TypeVar, Dict, Any, Tuple
 from aiodal.oqm.dbentity import (
     QueryableT,
     InsertableT,
@@ -93,14 +93,14 @@ class ListViewQuery(Generic[PaginateableT]):
         limit: int,
         results: Sequence[PaginateableT],
         next_url_start: Optional[str] = None,
-    ) -> Optional[str]:
+    ) -> Tuple[int, Optional[str]]:
         current_len = len(results)
         if current_len == 0:  # short circuit empty response
-            return None
+            return 0, None
 
         total_count = results[0].total_count  # grab the first
 
-        return _default_paginator(
+        return total_count, _default_paginator(
             request_url, offset, limit, current_len, total_count, next_url_start
         )
 
@@ -115,8 +115,31 @@ class ListViewQuery(Generic[PaginateableT]):
         url_start_index: Optional[str] = None,
     ) -> "ListViewQuery[PaginateableT]":
         results = await listq.list(transaction)
-        next_url = cls._paginator(request_url, offset, limit, results, url_start_index)
+        _, next_url = cls._paginator(
+            request_url, offset, limit, results, url_start_index
+        )
         return cls(next_url=next_url, results=results)
+
+
+@dataclasses.dataclass
+class TotalCountListViewQuery(ListViewQuery[PaginateableT]):
+    total_count: int = 0
+
+    @classmethod
+    async def from_query(
+        cls,
+        transaction: dal.TransactionManager,
+        request_url: str,
+        offset: int,
+        limit: int,
+        listq: IListQ[PaginateableT],
+        url_start_index: Optional[str] = None,
+    ) -> "ListViewQuery[PaginateableT]":
+        results = await listq.list(transaction)
+        tc, next_url = cls._paginator(
+            request_url, offset, limit, results, url_start_index
+        )
+        return cls(total_count=tc, next_url=next_url, results=results)
 
 
 @dataclasses.dataclass

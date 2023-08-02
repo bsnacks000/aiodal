@@ -68,9 +68,17 @@ def _default_paginator(
             idx = 0
         if "offset" not in request_url:
             if "?" in request_url:
-                off_lim = f"&offset={offset+limit}&limit={limit}"
+                off_lim = (
+                    f"&offset={offset+limit}"
+                    if "limit" in request_url
+                    else f"&offset={offset+limit}&limit={limit}"
+                )
             else:
-                off_lim = f"?offset={offset+limit}&limit={limit}"
+                off_lim = (
+                    f"?offset={offset+limit}"
+                    if "limit" in request_url
+                    else f"?offset={offset+limit}&limit={limit}"
+                )
             return request_url[idx:] + off_lim
         else:
             return request_url[idx:].replace(

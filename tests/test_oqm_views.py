@@ -148,6 +148,61 @@ async def test_list_view_query(transaction, mocker):
     assert len(response.results) == 100
 
 
+async def test_list_view_query_pagination(transaction, mocker):
+    async def mocked_list(cls_, transaction):
+        return [MockBook(id=i) for i in range(100)]
+
+    mocker.patch.object(BookListQ, "list", mocked_list)
+
+    offset = 0
+    limit = 10
+    url = f"https://mysite.com/v1/book/"
+
+    q = BookListQ(MockBookQueryParams())
+    response = await views.ListViewQuery.from_query(
+        transaction, url, offset, limit, q, "/v1"
+    )
+    assert response.next_url == "/v1/book/?offset=10&limit=10"
+    assert len(response.results) == 100
+
+    next_offset = 10  # in api context, this will be parsed from params...which will come in next url
+    response = await views.ListViewQuery.from_query(
+        transaction, response.next_url, next_offset, limit, q, "/v1"
+    )
+
+    assert response.next_url == "/v1/book/?offset=20&limit=10"
+    assert len(response.results) == 100
+
+
+async def test_list_view_query_pagination_with_limit_in_url_param(transaction, mocker):
+    async def mocked_list(cls_, transaction):
+        return [MockBook(id=i) for i in range(100)]
+
+    mocker.patch.object(BookListQ, "list", mocked_list)
+
+    offset = 0
+    limit = 10
+    url = f"https://mysite.com/v1/book/?blah=yada&limit=10"
+
+    q = BookListQ(MockBookQueryParams())
+    response = await views.ListViewQuery.from_query(
+        transaction, url, offset, limit, q, "/v1"
+    )
+
+    # limit is not added by aiodal paginator here...it comes in as params from url
+    assert response.next_url == "/v1/book/?blah=yada&limit=10&offset=10"
+    assert len(response.results) == 100
+
+    next_offset = 10  # in api context, this will be parsed from params...which will come in next url
+    response = await views.ListViewQuery.from_query(
+        transaction, response.next_url, next_offset, limit, q, "/v1"
+    )
+
+    # limit is not added by aiodal paginator here...it comes in as params from url
+    assert response.next_url == "/v1/book/?blah=yada&limit=10&offset=20"
+    assert len(response.results) == 100
+
+
 async def test_total_count_list_view_query(transaction, mocker):
     async def mocked_list(cls_, transaction):
         return [MockBook(id=i) for i in range(100)]

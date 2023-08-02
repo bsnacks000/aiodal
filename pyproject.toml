@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "aiodal"
-version = "0.5.0"
+version = "0.5.1"
 description = "async sqla data access layer and related tools"
 authors = ["bsnacks000 <bsnacks000@gmail.com>"]
 readme = "README.md"

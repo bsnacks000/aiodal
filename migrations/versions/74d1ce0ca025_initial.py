@@ -68,8 +68,8 @@ def upgrade() -> None:
     op.create_table(
         "table1",
         sa.Column("id", sa.Integer, primary_key=True, autoincrement=True),
-        sa.Column("column1", sa.String(64)),
-        # sa.UniqueConstraint("column1", name="uc__table1"),
+        sa.Column("column3", sa.String(64)),
+        sa.UniqueConstraint("column3", name="uc__testschema2table1"),
         schema="testschema2",
     )
 

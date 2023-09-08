@@ -55,16 +55,19 @@ async def test_dal_basics_listschema(listschema_transaction):
 
     # testschema2
     table2 = listschema_transaction.get_table("testschema2.table1")
+    assert listschema_transaction.get_unique_constraint("testschema2.table1") == [
+        "column3"
+    ]
 
     stmt = (
         sa.insert(table2)
-        .values(column1="kudibot")
-        .returning(table2.c.id, table2.c.column1)
+        .values(column3="kudibot")
+        .returning(table2.c.id, table2.c.column3)
     )
     result = await listschema_transaction.execute(stmt)
 
     me = result.one()
 
-    assert me.column1 == "kudibot"
+    assert me.column3 == "kudibot"
 
     await listschema_transaction.rollback()

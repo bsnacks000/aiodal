@@ -41,7 +41,7 @@ class DataAccessLayer(object):
         self,
         engine: AsyncEngine,
         metadata: Optional[sa.MetaData] = None,
-        schema: str | None | Sequence[str] = None,
+        schema: str | None | List[str] = None,
         views: bool = True,
         only: Sequence[str] | None = None,
         extend_existing: bool = False,
@@ -60,7 +60,7 @@ class DataAccessLayer(object):
         Args:
             engine (AsyncEngine): The sqla engine to bind on
             metadata (Optional[sa.MetaData], optional): An optional MetaData object. Defaults to None. If none sets to default `MetaData()`.
-            schema (str | None, optional): see `sa.MetaData.reflect`. Defaults to None.
+            schema (str | None | List[str], optional): see `sa.MetaData.reflect`. Defaults to None. Can be a single schema (str) or a list of schema (list[str])
             views (bool, optional): see `sa.MetaData.reflect`. Defaults to True.
             only (Sequence[str] | None, optional): see `sa.MetaData.reflect`. Defaults to None.
             extend_existing (bool, optional): see `sa.MetaData.reflect`. Defaults to False.
@@ -73,12 +73,10 @@ class DataAccessLayer(object):
         if not metadata:
             metadata = sa.MetaData()
 
-        ls_schema = [None]  # for tables without schema name
+        ls_schema: List[str | None] = [None]  # for tables without schema name
         # XXX probably should just limit to a list instead of iterable..mypy does not like it
         if isinstance(schema, Iterable) and not isinstance(schema, str):
-            ls_schema = list(
-                itertools.chain(ls_schema, schema)
-            )  # for iterable of schemas
+            ls_schema += schema
         elif isinstance(schema, str):
             ls_schema += [schema]
 

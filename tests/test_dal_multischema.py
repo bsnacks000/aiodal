@@ -67,4 +67,10 @@ async def test_dal_basics_with_multischema(multischema_transaction):
     table2_res = result.one()
     assert table2_res.column2 == "some book"
 
+    with pytest.raises(KeyError):
+        multischema_transaction.get_table("testschema2.table1")
+
+    with pytest.raises(KeyError):
+        multischema_transaction.get_table("table1")
+
     await multischema_transaction.rollback()

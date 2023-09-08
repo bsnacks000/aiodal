@@ -35,6 +35,12 @@ async def test_dal_basics(transaction):
     mybook = result.one()
     assert mybook.name == "some book"
 
+    with pytest.raises(KeyError):
+        transaction.get_table("testschema1.table1")
+
+    with pytest.raises(KeyError):
+        transaction.get_table("table1")
+
     await transaction.rollback()
 
 

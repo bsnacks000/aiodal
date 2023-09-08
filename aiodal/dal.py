@@ -1,5 +1,5 @@
 import contextlib
-from typing import List, AsyncIterator, Optional, Any
+from typing import List, AsyncIterator, Optional, Any, Tuple
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncConnection
 
 import sqlalchemy as sa
@@ -9,8 +9,10 @@ from sqlalchemy.engine.interfaces import (
     _CoreAnyExecuteParams,
     CoreExecuteOptionsParameter,
 )
+from collections.abc import Iterable
 
 from typing import Dict, Sequence
+import itertools
 
 
 class DataAccessLayer(object):
@@ -39,13 +41,13 @@ class DataAccessLayer(object):
         self,
         engine: AsyncEngine,
         metadata: Optional[sa.MetaData] = None,
-        schema: str | None = None,
+        schema: str | None | Sequence[str] = None,
         views: bool = True,
         only: Sequence[str] | None = None,
         extend_existing: bool = False,
         autoload_replace: bool = True,
         resolve_fks: bool = True,
-        **dialect_kwargs: Any
+        **dialect_kwargs: Any,
     ) -> None:
         """Takes an AsyncEngine and uses sqlalchemy reflection API to reflect the table data.
             Sets this state on the object.
@@ -66,28 +68,47 @@ class DataAccessLayer(object):
             resolve_fks (bool, optional): see `sa.MetaData.reflect`. Defaults to True.
 
         """
+        relect_metadata_first = True if metadata and metadata.schema else False
+
         if not metadata:
             metadata = sa.MetaData()
 
+        ls_schema = [None]  # for tables without schema name
+        # XXX probably should just limit to a list instead of iterable..mypy does not like it
+        if isinstance(schema, Iterable) and not isinstance(schema, str):
+            ls_schema = list(
+                itertools.chain(ls_schema, schema)
+            )  # for iterable of schemas
+        elif isinstance(schema, str):
+            ls_schema += [schema]
+
         def _reflect(con: sa.Connection) -> sa.Inspector:
             assert metadata is not None
+            if relect_metadata_first:  # metadata with schema is provided
+                metadata.reflect(
+                    bind=con,
+                    views=views,
+                    only=only,
+                    extend_existing=extend_existing,
+                    autoload_replace=autoload_replace,
+                    resolve_fks=resolve_fks,
+                    **dialect_kwargs,
+                )
 
-            metadata.reflect(
-                bind=con,
-                views=views,
-                schema=schema,
-                only=only,
-                extend_existing=extend_existing,
-                autoload_replace=autoload_replace,
-                resolve_fks=resolve_fks,
-                **dialect_kwargs
-            )
+            for schema_ in ls_schema:
+                metadata.reflect(
+                    bind=con,
+                    views=views,
+                    schema=schema_,
+                    only=only,
+                    extend_existing=extend_existing,
+                    autoload_replace=autoload_replace,
+                    resolve_fks=resolve_fks,
+                    **dialect_kwargs,
+                )
+
             inspector = sa.inspect(con)
-            tablenames = [t.name for t in metadata.sorted_tables]
-            for t in tablenames:
-                ucs = inspector.get_unique_constraints(t)  # list[dict]
-                for uc in ucs:
-                    self._constraints[t] = uc["column_names"]
+            self._gather_unique_contstraints(metadata, inspector)
             return inspector
 
         async with engine.connect() as conn:
@@ -127,7 +148,19 @@ class DataAccessLayer(object):
         Returns:
             sa.Table: The table.
         """
-        return self._metadata.tables[name]
+        return self.metadata.tables[name]
+
+    def _gather_unique_contstraints(
+        self, metadata: sa.MetaData, inspector: sa.Inspector
+    ) -> None:
+        tablenames: List[Tuple[str, Optional[str]]] = [
+            (t.name, t.schema) for t in metadata.sorted_tables
+        ]
+        for t, s in tablenames:
+            ucs = inspector.get_unique_constraints(t, s)  # list[dict]
+            for uc in ucs:
+                k: str = f"{s}.{t}" if s else t
+                self._constraints[k] = uc["column_names"]
 
     def get_unique_constraint(self, name: str) -> List[str]:
         """Get a unique constraint by key name. This works well if you name your unique constraints
@@ -216,7 +249,7 @@ class TransactionManager(object):
         statement: expression.Executable,
         parameters: _CoreAnyExecuteParams | None = None,
         *,
-        execution_options: CoreExecuteOptionsParameter | None = None
+        execution_options: CoreExecuteOptionsParameter | None = None,
     ) -> ResultProxy[Any]:
         """Execute a sqlalchemy statement on the connection.
 

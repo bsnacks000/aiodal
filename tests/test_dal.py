@@ -54,6 +54,7 @@ async def test_dal_setters_getters(engine_uri, transaction):
     with pytest.raises(KeyError):
         transaction.get_aliased(name="nonexistent table")
 
+    # db.reflect()
     author_table = db.get_table("author")
     assert author_table is not None
 

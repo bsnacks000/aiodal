@@ -1,29 +1,29 @@
 [tool.poetry]
-name = "aiodal"
-version = "0.6.1"
-description = "async sqla data access layer and related tools"
 authors = ["bsnacks000 <bsnacks000@gmail.com>"]
+description = "async sqla data access layer and related tools"
+name = "aiodal"
 readme = "README.md"
+version = "0.6.1"
 
 [tool.poetry.dependencies]
-python = ">=3.9"
 SQLAlchemy = ">=1.4,<3.0"
-pytest = "^7.2.1"
 anyio = "^4.0.0"
-
+asyncpg = "^0.29.0"
+pytest = "^7.2.1"
+python = ">=3.10,<4.0"
+asyncpg-stubs = "^0.29.1"
 
 [tool.poetry.group.dev.dependencies]
 alembic = "^1.9.3"
-asyncpg = "^0.27.0"
-pytest-cov = "^4.0.0"
-mypy = "^1.0.0"
 black = "^23.1.0"
-toml = "^0.10.2"
+mypy = "^1.0.0"
+pytest-cov = "^4.0.0"
 pytest-mock = "^3.10.0"
+toml = "^0.10.2"
 
 [build-system]
-requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+requires = ["poetry-core"]
 
 [tool.poetry.plugins.pytest11]
 aiodal_plugin = "aiodal.pytest_plugin"

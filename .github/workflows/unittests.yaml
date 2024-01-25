@@ -17,7 +17,7 @@ jobs:
 
     services:
       tsdb:
-        image: timescale/timescaledb:2.5.1-pg13
+        image: postgres:15
         env:
           POSTGRES_USER: bsnacks000
           POSTGRES_PASSWORD: iamgroot666
@@ -30,7 +30,7 @@ jobs:
     env:
       POSTGRES_USER: bsnacks000
       POSTGRES_PASSWORD: iamgroot666
-      POSTGRES_HOST: tsdb
+      POSTGRES_HOST: pgdb
       POSTGRES_PORT: 5432
       ENVIRONMENT: testing
 

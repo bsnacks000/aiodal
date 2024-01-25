@@ -24,12 +24,16 @@ from dataclasses import dataclass
 
 class IOpExecutor(abc.ABC):
     @abc.abstractmethod
-    async def execute(self, conn: asyncpg.Connection[Any]) -> str:
+    async def execute(self, conn: asyncpg.Connection) -> str:
         ...
 
 
 class StmtOp(IOpExecutor):
-    def __init__(self, *execute_args: Any, timeout: int = 10):
+    def __init__(
+        self,
+        execute_args: Tuple[Any, ...] = (),
+        timeout: int = 10,
+    ):
         self.execute_args = execute_args
         self.timeout = timeout
 
@@ -37,7 +41,7 @@ class StmtOp(IOpExecutor):
     def stmt(self) -> str:
         ...
 
-    async def execute(self, conn: asyncpg.Connection[Any]) -> str:
+    async def execute(self, conn: asyncpg.Connection) -> str:
         return await conn.execute(self.stmt(), *self.execute_args, timeout=self.timeout)
 
 
@@ -70,12 +74,12 @@ class TempTableOp(StmtOp):
         self,
         tablename: str,
         cols: TableColumns,
-        *execute_args: Any,
+        execute_args: Tuple[Any, ...] = (),
         timeout: int = 10,
     ):
         self.tablename = tablename
         self.cols = cols
-        super().__init__(*execute_args, timeout)
+        super().__init__(execute_args, timeout)
 
     def stmt(self) -> str:
         return f"create temp table {self.tablename} ({self.cols}) on commit drop;"
@@ -87,16 +91,16 @@ class LoadOpHandler(IOpExecutor):
         tmp: TempTableOp,
         target: StmtOp,
         source: PathLike[Any] | BinaryIO | AsyncIterable[bytes],
-        post: StmtOp | None = None,
+        post_copy: StmtOp | None = None,
         **copy_kwargs: Any,
     ):
         self.tmp = tmp
         self.target = target
-        self.post = post
+        self.post_copy = post_copy
         self.source = source
         self.copy_kwargs = copy_kwargs
 
-    async def execute(self, conn: asyncpg.Connection[Any]) -> str:
+    async def execute(self, conn: asyncpg.Connection) -> str:
         out = ""
         result = await self.tmp.execute(conn)
         out += result + "\n"
@@ -105,12 +109,12 @@ class LoadOpHandler(IOpExecutor):
             self.tmp.tablename, source=self.source, **self.copy_kwargs
         )
 
+        if self.post_copy:
+            result = await self.post_copy.execute(conn)
+            out += result + "\n"
+
         result = await self.target.execute(conn)
         out += result + "\n"
-
-        if self.post:
-            result = await self.post.execute(conn)
-            out += result + "\n"
 
         return out
 
@@ -150,7 +154,7 @@ class ExportOpHandler(IOpExecutor):
         self.query_args = query_args
         self.copy_kwargs = copy_kwargs
 
-    async def execute(self, conn: asyncpg.Connection[Any]) -> str:
+    async def execute(self, conn: asyncpg.Connection) -> str:
         return await conn.copy_from_query(
             self.query, *self.query_args, output=self.output, **self.copy_kwargs
         )

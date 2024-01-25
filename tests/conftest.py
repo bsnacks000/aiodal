@@ -7,7 +7,8 @@ import logging
 
 logger = logging.getLogger(__file__)
 
-POSTGRES_TEST_URI = "postgresql+asyncpg://bsnacks000:iamgroot666@tsdb:5432/testdb"
+POSTGRES_TEST_URI = "postgresql+asyncpg://bsnacks000:iamgroot666@pgdb:5432/testdb"
+POSTGRES_ASYNCPG_TEST_URI = "postgresql://bsnacks000:iamgroot666@pgdb:5432/testdb"
 
 
 # NOTE must add this to local scope
@@ -20,6 +21,11 @@ def anyio_backend():
 @pytest.fixture(scope="session")
 def engine_uri() -> str:
     return POSTGRES_TEST_URI
+
+
+@pytest.fixture(scope="session")
+def asyncpg_engine_uri() -> str:
+    return POSTGRES_ASYNCPG_TEST_URI
 
 
 class TestingEnum(Enum):

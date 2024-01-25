@@ -55,4 +55,4 @@ def sa_total_count(c: sa.Column[Any]) -> Any:
     Returns:
         sa.Label: The labeled Column (total_count)
     """
-    return sa.func.count(c).over().label("total_count")  # type: ignore
+    return sa.func.count(c).over().label("total_count")

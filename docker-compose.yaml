@@ -1,10 +1,10 @@
 version: '3.4'
 
 services:
-  tsdb:
+  pgdb:
     restart: "no"
-    container_name: "aiodal_tsdb"
-    image: timescale/timescaledb:2.5.1-pg13
+    container_name: "aiodal_pgdb"
+    image: postgres:15
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -30,14 +30,14 @@ services:
       - /bin/sh
       - -c
       - |
-        PGPASSWORD=${POSTGRES_PASSWORD} dropdb -h tsdb -p 5432 -U ${POSTGRES_USER} -e -f --if-exists testdb && \
-        PGPASSWORD=${POSTGRES_PASSWORD} createdb -h tsdb -p 5432 -U ${POSTGRES_USER} -e testdb
+        PGPASSWORD=${POSTGRES_PASSWORD} dropdb -h pgdb -p 5432 -U ${POSTGRES_USER} -e -f --if-exists testdb && \
+        PGPASSWORD=${POSTGRES_PASSWORD} createdb -h pgdb -p 5432 -U ${POSTGRES_USER} -e testdb
         poetry run alembic upgrade head
         coverage run --source=aiodal/ -m pytest -s -v && coverage report -m --fail-under=90
         poetry run mypy aiodal --strict
-        PGPASSWORD=${POSTGRES_PASSWORD} dropdb -h tsdb -p 5432 -U ${POSTGRES_USER} -e -f --if-exists testdb
+        PGPASSWORD=${POSTGRES_PASSWORD} dropdb -h pgdb -p 5432 -U ${POSTGRES_USER} -e -f --if-exists testdb
     depends_on:
-      - tsdb
+      - pgdb
 
 volumes:
   pgdata:

@@ -29,6 +29,12 @@ async def test_bulk_api(asyncpg_engine_uri):
                     from author_tmp;
         """
 
+    class AuthorAddIndexPostCopyOp(bulk.StmtOp):
+        def stmt(self) -> str:
+            return (
+                """create index idx_author_tmp_name on author_tmp((record->>'name'));"""
+            )
+
     class BookLoadOp(bulk.StmtOp):
         def stmt(self) -> str:
             return """ 
@@ -41,10 +47,14 @@ async def test_bulk_api(asyncpg_engine_uri):
         """
 
     author_load = AuthorJsonlLoadOp()
+    author_index_post_copy = AuthorAddIndexPostCopyOp()
     book_load = BookLoadOp()
 
     auth_handler = bulk.LoadOpHandler(
-        tmp=tmp_auth, target=author_load, source=fixture_dir / "authors.jsonl"
+        tmp=tmp_auth,
+        target=author_load,
+        source=fixture_dir / "authors.jsonl",
+        post_copy=author_index_post_copy,
     )
 
     book_handler = bulk.LoadOpHandler(

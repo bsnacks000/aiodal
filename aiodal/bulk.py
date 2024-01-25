@@ -18,7 +18,7 @@ Exporting is simpler and is controlled by a single query.
 import abc
 from typing import Any, AsyncIterable, BinaryIO, Sequence, Tuple, Callable, Coroutine
 from os import PathLike
-import asyncpg
+import asyncpg  # type: ignore
 from dataclasses import dataclass
 
 
@@ -42,7 +42,7 @@ class StmtOp(IOpExecutor):
         ...
 
     async def execute(self, conn: asyncpg.Connection) -> str:
-        return await conn.execute(self.stmt(), *self.execute_args, timeout=self.timeout)
+        return await conn.execute(self.stmt(), *self.execute_args, timeout=self.timeout)  # type: ignore[no-any-return]
 
 
 @dataclass
@@ -132,7 +132,7 @@ class BulkLoadScript:
         self.verbose = verbose
         self.connect_kwargs = connect_kwargs
 
-    async def run(self, verbose: bool = True):
+    async def run(self, verbose: bool = True) -> None:
         conn = await asyncpg.connect(self.url, **self.connect_kwargs)
         async with conn.transaction():
             for op in self.ops:
@@ -155,6 +155,6 @@ class ExportOpHandler(IOpExecutor):
         self.copy_kwargs = copy_kwargs
 
     async def execute(self, conn: asyncpg.Connection) -> str:
-        return await conn.copy_from_query(
+        return await conn.copy_from_query(  # type: ignore[no-any-return]
             self.query, *self.query_args, output=self.output, **self.copy_kwargs
         )

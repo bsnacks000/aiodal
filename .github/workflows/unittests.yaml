@@ -16,7 +16,7 @@ jobs:
     container: bsnacks000/python-poetry:3.11-1.3.2
 
     services:
-      tsdb:
+      pgdb:
         image: postgres:15
         env:
           POSTGRES_USER: bsnacks000

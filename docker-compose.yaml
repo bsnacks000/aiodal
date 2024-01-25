@@ -6,9 +6,9 @@ services:
     container_name: "aiodal_pgdb"
     image: postgres:15
     environment:
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=aiodaldb
     volumes:
       - pgdata:/var/lib/postgresql/data
     command: postgres -c 'max_connections=100'
@@ -30,12 +30,12 @@ services:
       - /bin/sh
       - -c
       - |
-        PGPASSWORD=${POSTGRES_PASSWORD} dropdb -h pgdb -p 5432 -U ${POSTGRES_USER} -e -f --if-exists testdb && \
-        PGPASSWORD=${POSTGRES_PASSWORD} createdb -h pgdb -p 5432 -U ${POSTGRES_USER} -e testdb
+        PGPASSWORD=postgres dropdb -h pgdb -p 5432 -U postgres -e -f --if-exists testdb && \
+        PGPASSWORD=postgres createdb -h pgdb -p 5432 -U postgres -e testdb
         poetry run alembic upgrade head
         coverage run --source=aiodal/ -m pytest -s -v && coverage report -m --fail-under=90
         poetry run mypy aiodal --strict
-        PGPASSWORD=${POSTGRES_PASSWORD} dropdb -h pgdb -p 5432 -U ${POSTGRES_USER} -e -f --if-exists testdb
+        PGPASSWORD=postgres dropdb -h pgdb -p 5432 -U postgres -e -f --if-exists testdb
     depends_on:
       - pgdb
 

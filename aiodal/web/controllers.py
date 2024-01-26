@@ -11,7 +11,7 @@ from fastapi import HTTPException
 from aiodal import dal
 from . import models, auth, paginator, context
 
-from typing import Generic, TypeVar, Any, TypeAlias
+from typing import Generic, Any, TypeAlias
 import sqlalchemy as sa
 from sqlalchemy.exc import DBAPIError, IntegrityError
 
@@ -21,87 +21,84 @@ import abc
 # see: https://github.com/cunybpl/aiodal/issues/17
 from sqlalchemy.sql.dml import ReturningDelete, ReturningInsert, ReturningUpdate
 
-
-SaRow = sa.Row[Any]
-FormDataT = TypeVar("FormDataT")  # generic T used to handle form data
-FilterDataT = TypeVar("FilterDataT")
 _T = Any
-
+SaRow = sa.Row[_T]
 SaReturningDelete: TypeAlias = ReturningDelete[_T]
 SaReturningInsert: TypeAlias = ReturningInsert[_T]
 SaReturningUpdate: TypeAlias = ReturningUpdate[_T]
 SaSelect: TypeAlias = sa.Select[_T]
 
 
-class IQueryable(abc.ABC, Generic[FilterDataT]):
-    """enable a dbentity to be readable/query-able; works with QueryParamsModel which
-    adds additonal where stmt to the output from query_stmt.
-
-    This is taken directly from oqm but with the caveat that it is not constructible. If/when
-    we revise oqm we will remove that constraint from this interface.
-    """
-
+class IListQueryable(abc.ABC):
     @abc.abstractmethod
     def query_stmt(
-        self, transaction: dal.TransactionManager, where: FilterDataT
+        self,
+        transaction: dal.TransactionManager,
+        where: context.ListContext[models.ListViewQueryParamsModelT, auth.Auth0UserT],
     ) -> SaSelect:
         ...
 
 
-class IDeleteable(abc.ABC, Generic[FormDataT]):
-    """Enable a dbentity to be deleteable"""
+class IDetailQueryable(abc.ABC):
+    @abc.abstractmethod
+    def query_stmt(
+        self,
+        transaction: dal.TransactionManager,
+        where: context.DetailContext[auth.Auth0UserT],
+    ) -> SaSelect:
+        ...
 
-    @classmethod
+
+class IVersionDetailQueryable(abc.ABC):
+    @abc.abstractmethod
+    def query_stmt(
+        self,
+        transaction: dal.TransactionManager,
+        where: context.UpdateContext[models.FormModelT, auth.Auth0UserT],
+    ) -> SaSelect:
+        ...
+
+
+class IDeleteable(abc.ABC):
     @abc.abstractmethod
     def delete_stmt(
-        cls, transaction: dal.TransactionManager, data: FormDataT
+        self,
+        transaction: dal.TransactionManager,
+        data: context.DetailContext[auth.Auth0UserT],
     ) -> SaReturningDelete:
         ...  # pragma: no cover
 
 
-class ICreatable(abc.ABC, Generic[FormDataT]):
-    """enable a dbentity to be writable; takes a pydantic BaseForm model, which contains data to be inserted into db."""
-
-    @classmethod
+class ICreatable(abc.ABC):
     @abc.abstractmethod
     def insert_stmt(
-        cls, transaction: dal.TransactionManager, data: FormDataT
+        self,
+        transaction: dal.TransactionManager,
+        data: context.CreateContext[models.FormModelT, auth.Auth0UserT],
     ) -> SaReturningInsert:
         ...  # pragma: no cover
 
 
-class IUpdateable(abc.ABC, Generic[FormDataT]):
-    """enable a dbentity to be updateable; takes a pydantic BaseForm model, which contains data to be inserted into db, and
-    a UpdateQueryParamsModel, in which addtional filtering logic can be implemented."""
-
-    @classmethod
+class IUpdateable(abc.ABC):
     @abc.abstractmethod
     def update_stmt(
-        cls,
+        self,
         transaction: dal.TransactionManager,
-        data: FormDataT,
+        data: context.UpdateContext[models.FormModelT, auth.Auth0UserT],
     ) -> SaReturningUpdate:
         ...  # pragma: no cover
 
 
-class DetailController(Generic[models.ResourceModelT, auth.Auth0UserT]):
-    def __init__(
-        self,
-        *,
-        q: IQueryable[context.RequestContext[auth.Auth0UserT]],
-        permissions: auth.IPermission | None = None,
-    ):
+class DetailController:
+    def __init__(self, *, q: IDetailQueryable, soft_deleted_field: str | None = None):
         self.q = q
-        self.permissions = permissions
+        self.soft_deleted_field = soft_deleted_field
 
     async def query(
         self,
         transaction: dal.TransactionManager,
-        ctx: context.RequestContext[auth.Auth0UserT],
+        ctx: context.DetailContext[auth.Auth0UserT],
     ) -> sa.Row[Any]:
-        if self.permissions:
-            await self.permissions.check(transaction, ctx.user)
-
         stmt = self.q.query_stmt(transaction, where=ctx)
         res = await transaction.execute(stmt)
         result = res.one_or_none()
@@ -109,33 +106,50 @@ class DetailController(Generic[models.ResourceModelT, auth.Auth0UserT]):
         if not result:
             raise HTTPException(status_code=404, detail="Not Found.")
 
-        if ctx.soft_delete_handler:
-            ctx.soft_delete_handler.status(result)
-
-        if ctx.etag:
-            ctx.etag.set_current_etag(ctx, result)
+        if self.soft_deleted_field:
+            if getattr(result, self.soft_deleted_field):
+                raise HTTPException(status_code=410, detail="Gone.")
 
         return result
 
 
-class UpdateController(Generic[auth.Auth0UserT]):
+class VersionDetailController:
     def __init__(
-        self,
-        *,
-        q: IUpdateable[context.RequestContext[auth.Auth0UserT]],
-        permissions: auth.IPermission | None = None,
+        self, *, q: IVersionDetailQueryable, soft_deleted_field: str | None = None
     ):
         self.q = q
-        self.permissions = permissions
+        self.soft_deleted_field = soft_deleted_field
+
+    async def query(
+        self,
+        transaction: dal.TransactionManager,
+        ctx: context.UpdateContext[models.FormModelT, auth.Auth0UserT],
+    ) -> sa.Row[Any]:
+        stmt = self.q.query_stmt(transaction, where=ctx)
+        res = await transaction.execute(stmt)
+        result = res.one_or_none()
+
+        if not result:
+            raise HTTPException(status_code=404, detail="Not Found.")
+
+        if self.soft_deleted_field:
+            if getattr(result, self.soft_deleted_field):
+                raise HTTPException(status_code=410, detail="Gone.")
+
+        ctx.etag.set_current(ctx.request.headers, result)
+
+        return result
+
+
+class UpdateController:
+    def __init__(self, *, q: IUpdateable):
+        self.q = q
 
     async def update(
         self,
         transaction: dal.TransactionManager,
-        ctx: context.RequestContext[auth.Auth0UserT],
-    ) -> sa.Row[Any]:
-        if self.permissions:
-            await self.permissions.check(transaction, ctx.user)
-
+        ctx: context.UpdateContext[models.FormModelT, auth.Auth0UserT],
+    ) -> SaRow:
         stmt = self.q.update_stmt(transaction, data=ctx)
 
         try:
@@ -156,24 +170,15 @@ class UpdateController(Generic[auth.Auth0UserT]):
         return result
 
 
-class CreateController(Generic[auth.Auth0UserT]):
-    def __init__(
-        self,
-        *,
-        q: ICreatable[context.RequestContext[auth.Auth0UserT]],
-        permissions: auth.IPermission | None = None,
-    ):
+class CreateController:
+    def __init__(self, *, q: ICreatable):
         self.q = q
-        self.permissions = permissions
 
     async def create(
         self,
         transaction: dal.TransactionManager,
-        ctx: context.RequestContext[auth.Auth0UserT],
-    ) -> sa.Row[Any]:
-        if self.permissions:
-            await self.permissions.check(transaction, ctx.user)
-
+        ctx: context.CreateContext[models.FormModelT, auth.Auth0UserT],
+    ) -> SaRow:
         stmt = self.q.insert_stmt(transaction, data=ctx)
 
         try:
@@ -192,23 +197,14 @@ class CreateController(Generic[auth.Auth0UserT]):
 
 
 class DeleteController(Generic[auth.Auth0UserT]):
-    def __init__(
-        self,
-        *,
-        q: IDeleteable[context.RequestContext[auth.Auth0UserT]],
-        permissions: auth.IPermission | None = None,
-    ):
+    def __init__(self, *, q: IDeleteable):
         self.q = q
-        self.permissions = permissions
 
     async def delete(
         self,
         transaction: dal.TransactionManager,
-        ctx: context.RequestContext[auth.Auth0UserT],
+        ctx: context.DetailContext[auth.Auth0UserT],
     ):
-        if self.permissions:
-            await self.permissions.check(transaction, ctx.user)
-
         stmt = self.q.delete_stmt(transaction, data=ctx)
 
         res = await transaction.execute(stmt)
@@ -218,24 +214,15 @@ class DeleteController(Generic[auth.Auth0UserT]):
             raise HTTPException(status_code=404, detail="Not Found.")
 
 
-class ListViewController(Generic[auth.Auth0UserT]):
-    def __init__(
-        self,
-        *,
-        q: IQueryable[context.RequestContext[auth.Auth0UserT]],
-        permissions: auth.IPermission | None = None,
-    ):
+class ListViewController:
+    def __init__(self, *, q: IListQueryable):
         self.q = q
-        self.permissions = permissions
 
     async def query(
         self,
         transaction: dal.TransactionManager,
-        ctx: context.RequestContext[auth.Auth0UserT],
+        ctx: context.ListContext[models.ListViewQueryParamsModelT, auth.Auth0UserT],
     ) -> paginator.ListViewData:
-        if self.permissions:
-            await self.permissions.check(transaction, ctx.user)
-
         # send the params wrapper into the generic where
         # should assure the QueryableT will have everything it needs
         stmt = self.q.query_stmt(transaction, where=ctx)
@@ -244,6 +231,6 @@ class ListViewController(Generic[auth.Auth0UserT]):
         return paginator.model_mapper(
             result,
             request_url=ctx.request_url,
-            offset=ctx.query_param("offset"),
-            limit=ctx.query_param("limit"),
+            offset=ctx.query_params.offset,
+            limit=ctx.query_params.limit,
         )

@@ -1,36 +1,25 @@
-from typing import Any, Dict, Generic
-
+from typing import Any, Generic
 from fastapi import Request
-
-from .auth import Auth0UserT, PermissionDataT
-from .models import IQueryParams
-from .version import EtagHandler, SoftDeleteHandler
-
-PathParamDict = Dict[str, Any]
+from . import models, auth, version
+from typing import Mapping
 
 
-class RequestContext(Generic[Auth0UserT]):
+class RequestContext(Generic[auth.Auth0UserT]):
     def __init__(
         self,
-        user: Auth0UserT,
-        request: Request,
         *,
-        query_params: IQueryParams | None = None,
-        paths: PathParamDict | None = None,
-        etag: EtagHandler | None = None,
-        soft_delete_handler: SoftDeleteHandler | None = None,
-        **extras: Any
+        user: auth.Auth0UserT,
+        request: Request,
     ):
-        """This is a simple proxy class to use to hold request data in a standardized way.
-        It exposes an API to bridge needed request data to our sqlalchemy/aiodal queries.
+        """The base context just holds a reference to the current user and access to the
+        current request.
+
+        Args:
+            user (auth.Auth0UserT): _description_
+            request (Request): _description_
         """
         self.user = user
         self.request = request
-        self.query_params = query_params
-        self.paths = paths
-        self.extras = extras
-        self.etag = etag
-        self.soft_delete_handler = soft_delete_handler
 
     @property
     def request_url(self) -> str:
@@ -41,47 +30,98 @@ class RequestContext(Generic[Auth0UserT]):
         """
         return str(self.request.url)
 
-    def query_param(self, lookup: str) -> Any:
-        """Guard for query param lookup. If this was not set in the
-        request context lookups will fail fast with an error.
+
+class ListContext(
+    RequestContext[auth.Auth0UserT],
+    Generic[models.ListViewQueryParamsModelT, auth.Auth0UserT],
+):
+    def __init__(
+        self,
+        *,
+        user: auth.Auth0UserT,
+        request: Request,
+        query_params: models.ListViewQueryParamsModelT,
+        path_params: Mapping[str, Any] | None = None,
+    ):
+        """QueryListContext specializes in list view queries. Our APIs must support pagination in the
+        form of limit/offset which is provided by inheriting from ListViewModel. This type is specifically
+        required to work with the ListViewController.
+
+        Path params are less restrictive and optional. They should be set directly in the route or in a dependency
+        before the data is passed into a controller.
 
         Args:
-            lookup (str): _description_
-
-        Returns:
-            Any: _description_
+            user (auth.Auth0UserT): _description_
+            request (Request): _description_
+            query_params (models.ListViewModelT): _description_
+            path_params (Mapping[str, Any] | None, optional): _description_. Defaults to None.
         """
-        assert self.query_params is not None, "params not set"
-        return self.query_params.param(lookup)
+        self.user = user
+        self.request = request
+        self.query_params = query_params
+        self.path_params = path_params
 
-    def path_param(self, lookup: str) -> Any:
-        """This is a guard around path param lookup. If this was not set in the
-        request context it will fail fast with an error.
+
+class DetailContext(RequestContext[auth.Auth0UserT]):
+    def __init__(
+        self,
+        *,
+        user: auth.Auth0UserT,
+        request: Request,
+        params: Mapping[str, Any] | None = None,
+    ):
+        """A QueryDetailContext specializes in a detail view. Detail views are often associated specifically with an
+        identifier (book/42) located in a path param. Some detail views however may return structured data represented as
+        a single object from a url without an identifier so this is optional. So in a sense this can be defined as any GET that is
+        _NOT_ a list view.
+
+        For updates we will often require an extra query to grab a lock or look up state.
+
+        In cases where we want to check a "deleted" status for a detail to throw 410 you can pass a
+        SoftDeleteHandler instance. Our detail Controller will use this if it is found.
 
         Args:
-            lookup (str): _description_
-
-        Returns:
-            Any: _description_
+            user (auth.Auth0UserT): _description_
+            request (Request): _description_
+            params (Mapping[str, Any] | None, optional): _description_. Defaults to None.
+            soft_delete_handler (version.SoftDeleteHandler | None, optional): _description_. Defaults to None.
         """
-        assert self.paths is not None, "paths not set"
-        return self.paths.get(lookup)
+        self.user = user
+        self.request = request
+        self.params = params
 
-    def extra(self, key: str) -> Any:
-        """Lookup an extra piece of data tied to the context.
 
-        Args:
-            key (str): The lookup field.
+class CreateContext(
+    RequestContext[auth.Auth0UserT],
+    Generic[models.FormModelT, auth.Auth0UserT],
+):
+    def __init__(
+        self,
+        *,
+        user: auth.Auth0UserT,
+        request: Request,
+        form: models.FormModelT,
+    ):
+        self.user = user
+        self.request = request
+        self.form = form
 
-        Returns:
-            Any: The value of the object.
-        """
-        return self.extras[key]
 
-    def allowed(self) -> PermissionDataT | None:
-        """Proxy a call into the user object to get allowed agencies for filtering purposes.
-
-        Returns:
-            _Ids | None: _description_
-        """
-        return self.user.get_permissions()
+class UpdateContext(
+    RequestContext[auth.Auth0UserT],
+    Generic[models.FormModelT, auth.Auth0UserT],
+):
+    def __init__(
+        self,
+        *,
+        user: auth.Auth0UserT,
+        request: Request,
+        form: models.FormModelT,
+        etag: version.EtagHandler,
+        params: Mapping[str, Any] | None = None,
+    ):
+        self.user = user
+        self.request = request
+        self.form = form
+        self.params = params
+        self.etag = etag

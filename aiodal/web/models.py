@@ -22,7 +22,13 @@ class ResourceModel(ApiBaseModel):
     ...
 
 
+# inbound resources (update/insert)
+class FormModel(ApiBaseModel):
+    ...
+
+
 ResourceModelT = TypeVar("ResourceModelT", bound=ResourceModel)
+FormModelT = TypeVar("FormModelT", bound=FormModel)
 ResourceUri = Annotated[str, URLPath]
 
 
@@ -52,16 +58,7 @@ class ListViewModel(ApiBaseModel, Generic[ResourceModelT]):
 ListViewModelT = TypeVar("ListViewModelT", bound=ListViewModel[Any])
 
 
-# query params --
-class IQueryParams(abc.ABC):
-    def param(self, lookup: str) -> Any:
-        return getattr(self, lookup)
-
-
-IQueryParamsT = TypeVar("IQueryParamsT", bound=IQueryParams)
-
-
-class ListViewQueryParamsModel(IQueryParams):
+class ListViewQueryParamsModel:
     """Query Params for list views should contain at least offset/limit to control the paginator."""
 
     def __init__(
@@ -71,3 +68,8 @@ class ListViewQueryParamsModel(IQueryParams):
     ):
         self.offset = offset
         self.limit = limit
+
+
+ListViewQueryParamsModelT = TypeVar(
+    "ListViewQueryParamsModelT", bound=ListViewQueryParamsModel
+)

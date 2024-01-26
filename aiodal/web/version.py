@@ -5,26 +5,9 @@ import sqlalchemy as sa
 from typing import Any
 from fastapi import HTTPException, Response
 
+from starlette.datastructures import Headers
+
 import uuid
-
-from .context import RequestContext
-from .auth import Auth0UserT
-
-
-class SoftDeleteHandler:
-    def __init__(self, soft_delete_field: str = "deleted"):
-        """A simple handler to check the status of whether an item was soft deleted as defined by the application."""
-        self.soft_delete_field = soft_delete_field
-
-    def status(self, obj: sa.Row[Any]):
-        """Validates that the row contains the correct deleted field specified and then checks its boolean value.
-        If the item was in the database at one point and then marked as deleted we can return a 410 response here.
-
-        """
-        assert hasattr(obj, self.soft_delete_field), "No soft delete field"
-
-        if getattr(obj, self.soft_delete_field):
-            raise HTTPException(status_code=410, detail="Gone.")
 
 
 class EtagHandler:
@@ -40,7 +23,7 @@ class EtagHandler:
         self.new_etag = uuid.uuid4().hex
         self.current_etag = None
 
-    def set_current_etag(self, ctx: RequestContext[Auth0UserT], obj: sa.Row[Any]):
+    def set_current(self, headers: Headers, obj: sa.Row[Any]):
         """First checks the header of the request context for If-Match, throwing 428 if not found. If this check passes it
         will then comparethe queried object's etag version against what was found in the request header.
 
@@ -58,12 +41,12 @@ class EtagHandler:
         """
         assert hasattr(obj, self.etag_version_field), "No etag version"
 
-        if "If-Match" not in ctx.request.headers:
+        if "If-Match" not in headers:
             raise HTTPException(
                 status_code=428, detail="Update requires If-Match header."
             )
 
-        if obj.etag_version != ctx.request.headers["If-Match"]:
+        if obj.etag_version != headers["If-Match"]:
             raise HTTPException(status_code=412, detail="Precondition Failed.")
 
         self.current_etag = obj.etag_version

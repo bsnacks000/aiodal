@@ -1,4 +1,5 @@
-from fastapi import FastAPI, HTTPException, Request, Depends, Security
+from fastapi import FastAPI, HTTPException, Request, Depends, Security, Header
+from sqlalchemy.engine import Row as Row
 from aiodal import dal, helpers
 from aiodal.web import auth, context, controllers, models, paginator, version
 import pydantic
@@ -9,10 +10,10 @@ import logging
 import uuid
 from sqlalchemy.ext.asyncio import create_async_engine
 import sqlalchemy as sa
-from typing import List, AsyncIterator
+from typing import Any, Coroutine, List, AsyncIterator
 
 
-from aiodal.web.controllers import SaReturningInsert, SaSelect
+from aiodal.web.controllers import SaReturningInsert, SaReturningUpdate, SaSelect
 
 ASYNCPG_POSTGRES_URI = os.environ.get("ASYNCPG_POSTGRES_URL", "")
 AUTH0_DOMAIN = os.environ.get("AUTH0_DOMAIN", "")
@@ -87,6 +88,17 @@ class BookQueryParams(models.ListViewQueryParamsModel):
     ...
 
 
+class BookUpdateForm(models.FormModel):
+    name: str | None = None
+
+
+class BookCreateForm(models.FormModel):
+    author_id: int
+    name: str
+    catalog: str
+
+
+# an example of doing this generically...
 class ListViewQueryable(controllers.IListQueryable):
     def __init__(self, t: str):
         self.t = t
@@ -120,8 +132,58 @@ class CreateQueryable(controllers.ICreatable):
         return stmt
 
 
+class OptLockQueryable(controllers.IVersionDetailQueryable):
+    def __init__(self, t: str):
+        self.t = t
+
+    def query_stmt(
+        self,
+        transaction: dal.TransactionManager,
+        where: context.UpdateContext[models.FormModelT, auth.Auth0UserT],
+    ) -> SaSelect:
+        assert where.params is not None
+        obj_id = where.params.get("id")
+        t = transaction.get_table(self.t)
+        stmt = sa.select(t.c.id, t.c.etag_version).where(t.c.id == obj_id)
+        return stmt
+
+
+class UpdateQueryable(controllers.IUpdateable):
+    def __init__(self, t: str):
+        self.t = t
+
+    def update_stmt(
+        self,
+        transaction: dal.TransactionManager,
+        data: context.UpdateContext[models.FormModelT, auth.Auth0UserT],
+    ) -> SaReturningUpdate:
+        assert data.params is not None
+        obj_id = data.params.get("id")
+
+        new_etag = data.etag.new_etag
+        curr_etag = data.etag.current_etag
+
+        t = transaction.get_table(self.t)
+
+        stmt = (
+            sa.update(t)
+            .values(
+                {
+                    "etag_version": new_etag,
+                    **data.form.model_dump(exclude_unset=True),
+                }
+            )
+            .where(t.c.id == obj_id)
+            .where(t.c.etag_version == curr_etag)
+            .returning(t)
+        )
+
+        return stmt
+
+
 @app.get(
-    "/book", response_model=BookListView, dependencies=[Depends(auth0.implicit_scheme)]
+    "/book",
+    dependencies=[Depends(auth0.implicit_scheme)],
 )
 async def get_book_list(
     request: Request,
@@ -136,9 +198,58 @@ async def get_book_list(
     return BookListView.model_validate(data)
 
 
-@app.post("/book")
-async def create():
-    ...
+@app.post(
+    "/book",
+    dependencies=[Depends(auth0.implicit_scheme)],
+)
+async def create(
+    request: Request,
+    form: BookCreateForm = Depends(),
+    user: ExampleUser = Security(auth0.get_user),
+    transaction: dal.TransactionManager = Depends(get_transaction),
+) -> Book:
+    ctx = context.CreateContext(user=user, request=request, form=form)
+    data = await controllers.CreateController(q=CreateQueryable("book")).create(
+        transaction, ctx
+    )
+    return Book.model_validate(data)
+
+
+import uuid
+
+
+def if_match_header(if_match: uuid.UUID = Header()):
+    return if_match
+
+
+@app.patch("/book/{id}", dependencies=[Depends(if_match_header)])
+async def patch_book(
+    request: Request,
+    id: int,
+    form: BookUpdateForm = Depends(),
+    user: ExampleUser = Security(auth0.get_user),
+    transaction: dal.TransactionManager = Depends(get_transaction),
+) -> Book:
+    # optimistic locking pattern ...
+    ctx = context.UpdateContext(
+        user=user,
+        request=request,
+        form=form,
+        etag=version.EtagHandler(),
+        params={"id": id},
+    )
+
+    # this is only used to set the etag on the context
+    # a pessimistic version might get a lock
+    _ = await controllers.VersionDetailController(q=OptLockQueryable("book")).query(
+        transaction, ctx
+    )
+
+    data = await controllers.UpdateController(q=UpdateQueryable("book")).update(
+        transaction, ctx
+    )
+
+    return Book.model_validate(data)
 
 
 @app.get("/book/{id}")
@@ -146,11 +257,6 @@ async def get_book_detail():
     ...
 
 
-@app.patch("/book/{id}")
-async def patch_book():
-    ...
-
-
 @app.delete("/book/")
-async def get_book():
+async def delete_book():
     ...

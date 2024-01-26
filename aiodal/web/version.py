@@ -47,6 +47,7 @@ class EtagHandler:
             )
 
         if obj.etag_version != headers["If-Match"]:
+            # print(obj.etag_version, headers["If-Match"])
             raise HTTPException(status_code=412, detail="Precondition Failed.")
 
         self.current_etag = obj.etag_version

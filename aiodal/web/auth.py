@@ -32,7 +32,7 @@ import abc
 
 from typing import Any, Sequence
 
-logger = logging.getLogger("fastapi_auth0")
+logger = logging.getLogger("aiodal_auth")
 
 
 class Auth0UnauthenticatedException(HTTPException):

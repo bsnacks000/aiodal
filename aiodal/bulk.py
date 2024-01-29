@@ -19,7 +19,7 @@ Exporting is simpler and is controlled by a single query.
 import abc
 from typing import Any, AsyncIterable, BinaryIO, Sequence, Tuple, Callable, Coroutine
 from os import PathLike
-import asyncpg  # type: ignore
+import asyncpg
 from dataclasses import dataclass
 
 

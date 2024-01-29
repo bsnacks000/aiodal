@@ -23,7 +23,7 @@ class EtagHandler:
         self.new_etag = uuid.uuid4().hex
         self.current_etag = None
 
-    def set_current(self, headers: Headers, obj: sa.Row[Any]):
+    def set_current(self, headers: Headers, obj: sa.Row[Any]) -> None:
         """First checks the header of the request context for If-Match, throwing 428 if not found. If this check passes it
         will then comparethe queried object's etag version against what was found in the request header.
 

@@ -204,7 +204,7 @@ class DeleteController(Generic[auth.Auth0UserT]):
         self,
         transaction: dal.TransactionManager,
         ctx: context.DetailContext[auth.Auth0UserT],
-    ):
+    ) -> None:
         stmt = self.q.delete_stmt(transaction, data=ctx)
 
         res = await transaction.execute(stmt)

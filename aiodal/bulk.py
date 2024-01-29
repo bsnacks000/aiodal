@@ -1,3 +1,4 @@
+# type: ignore
 """ An interface for using bulk insert/upsert/export via asyncpg `COPY`.
 These are essentially wrappers around asyncpg.Connection.copy_to_table and asyncpg.Connection.copy_from_query
 

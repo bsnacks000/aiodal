@@ -7,8 +7,8 @@ import logging
 
 logger = logging.getLogger(__file__)
 
-POSTGRES_TEST_URI = "postgresql+asyncpg://bsnacks000:iamgroot666@pgdb:5432/testdb"
-POSTGRES_ASYNCPG_TEST_URI = "postgresql://bsnacks000:iamgroot666@pgdb:5432/testdb"
+POSTGRES_TEST_URI = "postgresql+asyncpg://postgres:postgres@pgdb:5432/testdb"
+POSTGRES_ASYNCPG_TEST_URI = "postgresql://postgres:postgres@pgdb:5432/testdb"
 
 
 # NOTE must add this to local scope

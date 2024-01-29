@@ -19,8 +19,8 @@ jobs:
       pgdb:
         image: postgres:15
         env:
-          POSTGRES_USER: bsnacks000
-          POSTGRES_PASSWORD: iamgroot666
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
           POSTGRES_DB: testdb
         options: >-
           --health-cmd pg_isready 
@@ -28,8 +28,8 @@ jobs:
           --health-timeout 5s 
           --health-retries 5
     env:
-      POSTGRES_USER: bsnacks000
-      POSTGRES_PASSWORD: iamgroot666
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
       POSTGRES_HOST: pgdb
       POSTGRES_PORT: 5432
       ENVIRONMENT: testing

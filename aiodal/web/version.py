@@ -46,7 +46,8 @@ class EtagHandler:
                 status_code=428, detail="Update requires If-Match header."
             )
 
-        if obj.etag_version != headers["If-Match"]:
+        # need explicit conversion here from uuid to str
+        if str(obj.etag_version) != headers["If-Match"]:
             # print(obj.etag_version, headers["If-Match"])
             raise HTTPException(status_code=412, detail="Precondition Failed.")
 

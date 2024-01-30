@@ -1,4 +1,4 @@
-# only need this to make a mock app for testing
+# only need this to make a mock app for testing aiodal.web.auth
 
 from typing import Dict, Optional
 from fastapi import FastAPI, Depends, Security
@@ -43,6 +43,9 @@ auth_custom.jwks = {
 }
 auth_custom.algorithms = ["veryfast"]
 app = FastAPI()
+
+
+# set ups for testing auth functionality
 
 
 @app.get("/public")

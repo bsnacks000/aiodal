@@ -23,7 +23,9 @@ services:
     restart: "no"
     image: aiodal:dev
     container_name: "aiodal_testapp"
-    build: .
+    build:
+      context: .
+      dockerfile: ./Dockerfile
     volumes:
       - .:/app
     command:

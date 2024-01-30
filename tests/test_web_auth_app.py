@@ -1,4 +1,4 @@
-from .app import app, CustomAuth0User
+from .authapp import app, CustomAuth0User
 import base64
 import json
 from typing import Dict

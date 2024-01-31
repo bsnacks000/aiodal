@@ -116,7 +116,7 @@ class UpdateContext(
         *,
         user: auth.Auth0UserT,
         request: Request,
-        form: models.FormModelT | None,
+        form: models.FormModelT,
         etag: version.EtagHandler,
         params: Mapping[str, Any] | None = None,
     ):

@@ -176,3 +176,32 @@ async def module_books(module_transaction):
         .returning(tab)
     )
     await module_transaction.execute(stmt)
+
+
+# this is for when there is some db error and we roll the transaction back
+@pytest.fixture
+async def authors_fixture(module_transaction):
+    author_data = [{"name": "Hep"}, {"name": "Tup"}, {"name": "Pup"}]
+    tab = module_transaction.get_table("author")
+    stmt = (
+        sa.insert(tab)
+        .values([{**rec, "id": i} for i, rec in enumerate(author_data, start=1)])
+        .returning(tab)
+    )
+    await module_transaction.execute(stmt)
+
+
+@pytest.fixture
+async def books_fixture(module_transaction):
+    book_data = [
+        {"author_id": 1, "name": "Gone with the Fin", "catalog": "Boring"},
+        {"author_id": 2, "name": "Needless Things", "catalog": "Really Boring"},
+        {"author_id": 3, "name": "War of the Zorlds", "catalog": "Exciting"},
+    ]
+    tab = module_transaction.get_table("book")
+    stmt = (
+        sa.insert(tab)
+        .values([{**rec, "id": i} for i, rec in enumerate(book_data, start=1)])
+        .returning(tab)
+    )
+    await module_transaction.execute(stmt)

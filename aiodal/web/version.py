@@ -2,11 +2,11 @@
 from .models import VersionedResourceModel
 import sqlalchemy as sa
 
-from typing import Any
+from typing import Any, Awaitable, no_type_check, no_type_check_decorator
 from fastapi import HTTPException, Response
 
 from starlette.datastructures import Headers
-
+from functools import wraps
 import uuid
 
 
@@ -20,7 +20,7 @@ class EtagHandler:
             etag_version_field (str, optional): Name of the field to look up in the sa.Row. Defaults to "etag_version".
         """
         self.etag_version_field = etag_version_field
-        self.new_etag = uuid.uuid4().hex
+        self.new_etag = uuid.uuid4()
         self.current_etag = None
 
     def set_current(self, headers: Headers, obj: sa.Row[Any]) -> None:
@@ -40,7 +40,6 @@ class EtagHandler:
             HTTPException: 428 If no etag in header.
         """
         assert hasattr(obj, self.etag_version_field), "No etag version"
-
         if "If-Match" not in headers:
             raise HTTPException(
                 status_code=428, detail="Update requires If-Match header."
@@ -63,3 +62,18 @@ def set_header(response: Response, result: VersionedResourceModel) -> None:
     """
     if result.etag_version:
         response.headers["Etag"] = result.etag_version
+
+
+@no_type_check
+@no_type_check_decorator
+def set_etag_on_response_coroutine(func):
+    """a decorator for coroutine routers that adds Etag to the response by extracting etag_version from the response data."""
+
+    @wraps(func)
+    async def wrapper(*args, **kwargs):
+        result = await func(*args, **kwargs)
+        response = kwargs["response"]
+        response.headers["Etag"] = str(result.etag_version)
+        return result
+
+    return wrapper

@@ -151,7 +151,6 @@ class UpdateController:
         ctx: context.UpdateContext[models.FormModelT, auth.Auth0UserT],
     ) -> SaRow:
         stmt = self.q.update_stmt(transaction, data=ctx)
-
         try:
             res = await transaction.execute(stmt)
 

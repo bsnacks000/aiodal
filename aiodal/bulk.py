@@ -1,3 +1,4 @@
+# type: ignore
 """ An interface for using bulk insert/upsert/export via asyncpg `COPY`.
 These are essentially wrappers around asyncpg.Connection.copy_to_table and asyncpg.Connection.copy_from_query
 
@@ -18,7 +19,7 @@ Exporting is simpler and is controlled by a single query.
 import abc
 from typing import Any, AsyncIterable, BinaryIO, Sequence, Tuple, Callable, Coroutine
 from os import PathLike
-import asyncpg  # type: ignore
+import asyncpg
 from dataclasses import dataclass
 
 

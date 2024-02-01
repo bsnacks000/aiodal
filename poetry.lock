@@ -24,7 +24,7 @@ tz = ["backports.zoneinfo"]
 name = "annotated-types"
 version = "0.6.0"
 description = "Reusable constraint types to use with typing.Annotated"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.8"
 files = [
@@ -264,7 +264,7 @@ toml = ["tomli"]
 name = "ecdsa"
 version = "0.18.0"
 description = "ECDSA cryptographic signature library (pure python)"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=2.6, !=3.0.*, !=3.1.*, !=3.2.*"
 files = [
@@ -298,7 +298,7 @@ test = ["pytest (>=6)"]
 name = "fastapi"
 version = "0.109.0"
 description = "FastAPI framework, high performance, easy to learn, fast to code, ready for production"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.8"
 files = [
@@ -678,7 +678,7 @@ testing = ["pytest", "pytest-benchmark"]
 name = "pyasn1"
 version = "0.5.1"
 description = "Pure-Python implementation of ASN.1 types and DER/BER/CER codecs (X.208)"
-category = "dev"
+category = "main"
 optional = false
 python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,>=2.7"
 files = [
@@ -690,7 +690,7 @@ files = [
 name = "pydantic"
 version = "2.5.3"
 description = "Data validation using Python type hints"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.7"
 files = [
@@ -710,7 +710,7 @@ email = ["email-validator (>=2.0.0)"]
 name = "pydantic-core"
 version = "2.14.6"
 description = ""
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.7"
 files = [
@@ -888,7 +888,7 @@ dev = ["pre-commit", "pytest-asyncio", "tox"]
 name = "python-jose"
 version = "3.3.0"
 description = "JOSE implementation in Python"
-category = "dev"
+category = "main"
 optional = false
 python-versions = "*"
 files = [
@@ -910,7 +910,7 @@ pycryptodome = ["pyasn1", "pycryptodome (>=3.3.1,<4.0.0)"]
 name = "rsa"
 version = "4.2"
 description = "Pure-Python RSA implementation"
-category = "dev"
+category = "main"
 optional = false
 python-versions = "*"
 files = [
@@ -924,7 +924,7 @@ pyasn1 = ">=0.1.3"
 name = "six"
 version = "1.16.0"
 description = "Python 2 and 3 compatibility utilities"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*"
 files = [
@@ -1036,7 +1036,7 @@ sqlcipher = ["sqlcipher3_binary"]
 name = "starlette"
 version = "0.35.1"
 description = "The little ASGI library that shines."
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.8"
 files = [
@@ -1110,4 +1110,4 @@ standard = ["colorama (>=0.4)", "httptools (>=0.5.0)", "python-dotenv (>=0.13)",
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9"
-content-hash = "c6e9a8cd9f10a18b8c03382e18f2bb775190f67f68160df035b524fd93ed7e70"
+content-hash = "c82c2336656872b4553f68d9f41215307794b90edb51a992b87334539b875286"

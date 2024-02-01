@@ -11,11 +11,6 @@ anyio = "^4.0.0"
 asyncpg = "^0.27.0"
 pytest = "^7.2.1"
 python = ">=3.9"
-
-[tool.poetry.group.web]
-optional = true
-
-[tool.poetry.group.web.dependencies]
 fastapi = "^0.109"
 python-jose = "^3.3.0"
 

@@ -8,6 +8,6 @@ COPY . /app
 # wait utility -- define WAIT_HOSTS in docker
 ADD https://github.com/ufoscout/docker-compose-wait/releases/download/2.2.1/wait /wait
 RUN chmod +x /wait \
-    && poetry install --with=web \
+    && poetry install \
     && apt update  \
     && apt install -y postgresql-client

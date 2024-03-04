@@ -39,8 +39,7 @@ AUTH0_API_AUDIENCE = os.environ.get("AUTH0_API_AUDIENCE", "")
 # set up an auth0 user
 
 
-class ExampleUser(auth.Auth0User):
-    ...
+class ExampleUser(auth.Auth0User): ...
 
 
 auth0 = auth.Auth0(
@@ -103,8 +102,7 @@ async def get_transaction() -> AsyncIterator[dal.TransactionManager]:
             raise HTTPException(status_code=500, detail="Server Error.")
 
 
-class BookQueryParams(models.ListViewQueryParamsModel):
-    ...
+class BookQueryParams(models.ListViewQueryParamsModel): ...
 
 
 class BookUpdateForm(models.FormModel):
@@ -188,6 +186,24 @@ class OptLockQueryable(
         self,
         transaction: dal.TransactionManager,
         where: context.UpdateContext[BookUpdateForm, ExampleUser],
+    ) -> SaSelect:
+        assert where.params is not None
+        obj_id = where.params.get("id")
+        t = transaction.get_table(self.t)
+        stmt = sa.select(t.c.id, t.c.etag_version, t.c.deleted).where(t.c.id == obj_id)
+        return stmt
+
+
+class SoftDeleteOptLockQueryable(
+    controllers.IVersionDetailQueryable[BookDeleteForm, ExampleUser]
+):
+    def __init__(self, t: str):
+        self.t = t
+
+    def query_stmt(
+        self,
+        transaction: dal.TransactionManager,
+        where: context.UpdateContext[BookDeleteForm, ExampleUser],
     ) -> SaSelect:
         assert where.params is not None
         obj_id = where.params.get("id")
@@ -408,10 +424,10 @@ async def soft_delete_book(
     # this is only used to set the etag on the context
     # a pessimistic version might get a lock
     _ = await controllers.VersionDetailController(
-        q=OptLockQueryable("book"), soft_deleted_field="deleted"
+        q=SoftDeleteOptLockQueryable("book"), soft_deleted_field="deleted"
     ).query(transaction, ctx)
 
-    data = await controllers.UpdateController(q=SoftDeleteQueryable("book")).update(
+    _ = await controllers.UpdateController(q=SoftDeleteQueryable("book")).update(
         transaction, ctx
     )
 

@@ -122,7 +122,9 @@ class BookDeleteForm(models.FormModel):
 
 
 # an example of doing this generically...
-class ListViewQueryable(controllers.IListQueryable):
+class ListViewQueryable(
+    controllers.IListQueryable[models.ListViewQueryParamsModelT, auth.Auth0UserT]
+):
     def __init__(self, t: str):
         self.t = t
 

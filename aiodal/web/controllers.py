@@ -29,7 +29,9 @@ SaReturningUpdate: TypeAlias = ReturningUpdate[_T]
 SaSelect: TypeAlias = sa.Select[_T]
 
 
-class IListQueryable(abc.ABC):
+class IListQueryable(
+    abc.ABC, Generic[models.ListViewQueryParamsModelT, auth.Auth0UserT]
+):
     @abc.abstractmethod
     def query_stmt(
         self,
@@ -214,7 +216,9 @@ class DeleteController(Generic[auth.Auth0UserT]):
 
 
 class ListViewController:
-    def __init__(self, *, q: IListQueryable):
+    def __init__(
+        self, *, q: IListQueryable[models.ListViewQueryParamsModelT, auth.Auth0UserT]
+    ):
         self.q = q
 
     async def query(

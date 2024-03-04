@@ -66,7 +66,7 @@ def set_header(response: Response, result: VersionedResourceModel) -> None:
 
 @no_type_check
 @no_type_check_decorator
-def set_etag_on_response_coroutine(func):
+def set_etag_on_response_coroutine(func: callable):
     """a decorator for coroutine routers that adds Etag to the response by extracting etag_version from the response data."""
 
     @wraps(func)

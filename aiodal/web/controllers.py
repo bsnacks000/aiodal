@@ -7,6 +7,7 @@ This API should be flexible enough to CRUD against tables in a declarative style
 handle more complex queries or CUD scenarios.
 
 """
+
 from fastapi import HTTPException
 from aiodal import dal
 from . import models, auth, paginator, context
@@ -37,62 +38,61 @@ class IListQueryable(
         self,
         transaction: dal.TransactionManager,
         where: context.ListContext[models.ListViewQueryParamsModelT, auth.Auth0UserT],
-    ) -> SaSelect:
-        ...
+    ) -> SaSelect: ...
 
 
-class IDetailQueryable(abc.ABC):
+class IDetailQueryable(abc.ABC, Generic[auth.Auth0UserT]):
     @abc.abstractmethod
     def query_stmt(
         self,
         transaction: dal.TransactionManager,
         where: context.DetailContext[auth.Auth0UserT],
-    ) -> SaSelect:
-        ...
+    ) -> SaSelect: ...
 
 
-class IVersionDetailQueryable(abc.ABC):
+class IVersionDetailQueryable(abc.ABC, Generic[models.FormModelT, auth.Auth0UserT]):
     @abc.abstractmethod
     def query_stmt(
         self,
         transaction: dal.TransactionManager,
         where: context.UpdateContext[models.FormModelT, auth.Auth0UserT],
-    ) -> SaSelect:
-        ...
+    ) -> SaSelect: ...
 
 
-class IDeleteable(abc.ABC):
+class IDeleteable(abc.ABC, Generic[auth.Auth0UserT]):
     @abc.abstractmethod
     def delete_stmt(
         self,
         transaction: dal.TransactionManager,
         data: context.DetailContext[auth.Auth0UserT],
-    ) -> SaReturningDelete:
-        ...  # pragma: no cover
+    ) -> SaReturningDelete: ...  # pragma: no cover
 
 
-class ICreatable(abc.ABC):
+class ICreatable(abc.ABC, Generic[models.FormModelT, auth.Auth0UserT]):
     @abc.abstractmethod
     def insert_stmt(
         self,
         transaction: dal.TransactionManager,
         data: context.CreateContext[models.FormModelT, auth.Auth0UserT],
-    ) -> SaReturningInsert:
-        ...  # pragma: no cover
+    ) -> SaReturningInsert: ...  # pragma: no cover
 
 
-class IUpdateable(abc.ABC):
+class IUpdateable(abc.ABC, Generic[models.FormModelT, auth.Auth0UserT]):
     @abc.abstractmethod
     def update_stmt(
         self,
         transaction: dal.TransactionManager,
         data: context.UpdateContext[models.FormModelT, auth.Auth0UserT],
-    ) -> SaReturningUpdate:
-        ...  # pragma: no cover
+    ) -> SaReturningUpdate: ...  # pragma: no cover
 
 
-class DetailController:
-    def __init__(self, *, q: IDetailQueryable, soft_deleted_field: str | None = None):
+class DetailController(Generic[auth.Auth0UserT]):
+    def __init__(
+        self,
+        *,
+        q: IDetailQueryable[auth.Auth0UserT],
+        soft_deleted_field: str | None = None,
+    ):
         self.q = q
         self.soft_deleted_field = soft_deleted_field
 
@@ -115,9 +115,12 @@ class DetailController:
         return result
 
 
-class VersionDetailController:
+class VersionDetailController(Generic[models.FormModelT, auth.Auth0UserT]):
     def __init__(
-        self, *, q: IVersionDetailQueryable, soft_deleted_field: str | None = None
+        self,
+        *,
+        q: IVersionDetailQueryable[models.FormModelT, auth.Auth0UserT],
+        soft_deleted_field: str | None = None,
     ):
         self.q = q
         self.soft_deleted_field = soft_deleted_field
@@ -143,8 +146,8 @@ class VersionDetailController:
         return result
 
 
-class UpdateController:
-    def __init__(self, *, q: IUpdateable):
+class UpdateController(Generic[models.FormModelT, auth.Auth0UserT]):
+    def __init__(self, *, q: IUpdateable[models.FormModelT, auth.Auth0UserT]):
         self.q = q
 
     async def update(
@@ -171,8 +174,8 @@ class UpdateController:
         return result
 
 
-class CreateController:
-    def __init__(self, *, q: ICreatable):
+class CreateController(Generic[models.FormModelT, auth.Auth0UserT]):
+    def __init__(self, *, q: ICreatable[models.FormModelT, auth.Auth0UserT]):
         self.q = q
 
     async def create(
@@ -198,7 +201,7 @@ class CreateController:
 
 
 class DeleteController(Generic[auth.Auth0UserT]):
-    def __init__(self, *, q: IDeleteable):
+    def __init__(self, *, q: IDeleteable[auth.Auth0UserT]):
         self.q = q
 
     async def delete(
@@ -215,7 +218,7 @@ class DeleteController(Generic[auth.Auth0UserT]):
             raise HTTPException(status_code=404, detail="Not Found.")
 
 
-class ListViewController:
+class ListViewController(Generic[models.ListViewQueryParamsModelT, auth.Auth0UserT]):
     def __init__(
         self, *, q: IListQueryable[models.ListViewQueryParamsModelT, auth.Auth0UserT]
     ):

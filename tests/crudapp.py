@@ -39,8 +39,7 @@ AUTH0_API_AUDIENCE = os.environ.get("AUTH0_API_AUDIENCE", "")
 # set up an auth0 user
 
 
-class ExampleUser(auth.Auth0User):
-    ...
+class ExampleUser(auth.Auth0User): ...
 
 
 auth0 = auth.Auth0(
@@ -101,8 +100,7 @@ async def get_transaction() -> AsyncIterator[dal.TransactionManager]:
             raise HTTPException(status_code=500, detail="Server Error.")
 
 
-class BookQueryParams(models.ListViewQueryParamsModel):
-    ...
+class BookQueryParams(models.ListViewQueryParamsModel): ...
 
 
 class BookUpdateForm(models.FormModel):

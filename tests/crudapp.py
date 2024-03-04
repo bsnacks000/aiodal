@@ -20,7 +20,7 @@ import logging
 import uuid
 from sqlalchemy.ext.asyncio import create_async_engine
 import sqlalchemy as sa
-from typing import Any, Coroutine, List, AsyncIterator, Annotated
+from typing import Any, Coroutine, List, AsyncIterator, Annotated, AsyncGenerator
 
 
 from aiodal.web.controllers import (
@@ -39,7 +39,8 @@ AUTH0_API_AUDIENCE = os.environ.get("AUTH0_API_AUDIENCE", "")
 # set up an auth0 user
 
 
-class ExampleUser(auth.Auth0User): ...
+class ExampleUser(auth.Auth0User):
+    ...
 
 
 auth0 = auth.Auth0(
@@ -55,7 +56,9 @@ db = dal.DataAccessLayer()
 
 # new way to do startup
 @contextlib.asynccontextmanager
-async def startup(_: FastAPI):  # configure and load postgres
+async def startup(
+    _: FastAPI,
+) -> AsyncGenerator[None, None]:  # configure and load postgres
     engine = create_async_engine(ASYNCPG_POSTGRES_URI)
     metadata = sa.MetaData()
     auth0.initialize_jwks()
@@ -100,7 +103,8 @@ async def get_transaction() -> AsyncIterator[dal.TransactionManager]:
             raise HTTPException(status_code=500, detail="Server Error.")
 
 
-class BookQueryParams(models.ListViewQueryParamsModel): ...
+class BookQueryParams(models.ListViewQueryParamsModel):
+    ...
 
 
 class BookUpdateForm(models.FormModel):
@@ -120,16 +124,14 @@ class BookDeleteForm(models.FormModel):
 
 
 # an example of doing this generically...
-class ListViewQueryable(
-    controllers.IListQueryable[models.ListViewQueryParamsModelT, auth.Auth0UserT]
-):
+class ListViewQueryable(controllers.IListQueryable[BookQueryParams, ExampleUser]):
     def __init__(self, t: str):
         self.t = t
 
     def query_stmt(
         self,
         transaction: dal.TransactionManager,
-        where: context.ListContext[models.ListViewQueryParamsModelT, auth.Auth0UserT],
+        where: context.ListContext[BookQueryParams, ExampleUser],
     ) -> SaSelect:
         t = transaction.get_table(self.t)
         stmt = sa.select(t, helpers.sa_total_count(t.c.id)).order_by(t.c.id)
@@ -141,28 +143,28 @@ class ListViewQueryable(
         return stmt
 
 
-class CreateQueryable(controllers.ICreatable):
+class CreateQueryable(controllers.ICreatable[BookCreateForm, ExampleUser]):
     def __init__(self, t: str):
         self.t = t
 
     def insert_stmt(
         self,
         transaction: dal.TransactionManager,
-        data: context.CreateContext[models.FormModelT, auth.Auth0UserT],
+        data: context.CreateContext[BookCreateForm, ExampleUser],
     ) -> SaReturningInsert:
         t = transaction.get_table(self.t)
         stmt = sa.insert(t).values(**data.form.model_dump()).returning(t)
         return stmt
 
 
-class DetailQueryable(controllers.IDetailQueryable):
+class DetailQueryable(controllers.IDetailQueryable[ExampleUser]):
     def __init__(self, t: str):
         self.t = t
 
     def query_stmt(
         self,
         transaction: dal.TransactionManager,
-        where: context.DetailContext[auth.Auth0UserT],
+        where: context.DetailContext[ExampleUser],
     ) -> SaSelect:
         assert where.params is not None
         obj_id = where.params.get("id")
@@ -171,14 +173,21 @@ class DetailQueryable(controllers.IDetailQueryable):
         return stmt
 
 
-class OptLockQueryable(controllers.IVersionDetailQueryable):
+from typing import Union
+
+# VersionDetailType = Union[BookDeleteForm, BookUpdateForm]
+
+
+class OptLockQueryable(
+    controllers.IVersionDetailQueryable[BookUpdateForm, ExampleUser]
+):
     def __init__(self, t: str):
         self.t = t
 
     def query_stmt(
         self,
         transaction: dal.TransactionManager,
-        where: context.UpdateContext[models.FormModelT, auth.Auth0UserT],
+        where: context.UpdateContext[BookUpdateForm, ExampleUser],
     ) -> SaSelect:
         assert where.params is not None
         obj_id = where.params.get("id")
@@ -187,14 +196,14 @@ class OptLockQueryable(controllers.IVersionDetailQueryable):
         return stmt
 
 
-class UpdateQueryable(controllers.IUpdateable):
+class UpdateQueryable(controllers.IUpdateable[BookUpdateForm, ExampleUser]):
     def __init__(self, t: str):
         self.t = t
 
     def update_stmt(
         self,
         transaction: dal.TransactionManager,
-        data: context.UpdateContext[models.FormModelT, auth.Auth0UserT],
+        data: context.UpdateContext[BookUpdateForm, ExampleUser],
     ) -> SaReturningUpdate:
         assert data.params is not None
         obj_id = data.params.get("id")
@@ -220,14 +229,14 @@ class UpdateQueryable(controllers.IUpdateable):
         return stmt
 
 
-class SoftDeleteQueryable(controllers.IUpdateable):
+class SoftDeleteQueryable(controllers.IUpdateable[BookDeleteForm, ExampleUser]):
     def __init__(self, t: str):
         self.t = t
 
     def update_stmt(
         self,
         transaction: dal.TransactionManager,
-        data: context.UpdateContext[models.FormModelT, auth.Auth0UserT],
+        data: context.UpdateContext[BookDeleteForm, ExampleUser],
     ) -> SaReturningUpdate:
         assert data.params is not None
         obj_id = data.params.get("id")
@@ -254,14 +263,14 @@ class SoftDeleteQueryable(controllers.IUpdateable):
         return stmt
 
 
-class DeleteQueryable(controllers.IDeleteable):
+class DeleteQueryable(controllers.IDeleteable[ExampleUser]):
     def __init__(self, t: str):
         self.t = t
 
     def delete_stmt(
         self,
         transaction: dal.TransactionManager,
-        data: context.DetailContext[auth.Auth0UserT],
+        data: context.DetailContext[ExampleUser],
     ) -> SaReturningDelete:
         assert data.params is not None
         obj_id = data.params.get("id")
@@ -304,12 +313,12 @@ async def create_book(
 import uuid
 
 
-def if_match_header(if_match: uuid.UUID = Header()):
+def if_match_header(if_match: uuid.UUID = Header()) -> uuid.UUID:
     return if_match
 
 
 @app.patch("/book/{id}", dependencies=[Depends(if_match_header)])
-@version.set_etag_on_response_coroutine
+@version.set_etag_on_response_coroutine  # type: ignore[misc]
 async def patch_book(
     request: Request,
     response: Response,

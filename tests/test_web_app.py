@@ -17,6 +17,28 @@ async def test_get_book_list(module_test_app, module_authors, module_books):
         assert len(result) == 3
 
 
+async def test_get_book_list_multi_ids(module_test_app, module_authors, module_books):
+    app = module_test_app
+    async with httpx.AsyncClient(app=app, base_url="https://fake.com") as client:
+        path = app.url_path_for("get_book_list_multi_ids")
+
+        response = await client.get(path, params={"ids": [1]})
+        assert response.status_code == 200
+        res = response.json()
+        result = res["results"]
+        assert len(result) == 1
+
+        # max
+        response = await client.get(path, params={"ids": [1, 2, 3, 4, 5, 6]})
+        assert response.status_code == 422
+
+        response = await client.get(path)
+        assert response.status_code == 422
+
+        response = await client.get(path, params={"ids": []})
+        assert response.status_code == 422
+
+
 async def test_create_book(
     module_test_app, module_transaction, module_authors, module_books
 ):

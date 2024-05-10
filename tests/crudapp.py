@@ -7,6 +7,7 @@ from fastapi import (
     Security,
     Header,
     Body,
+    Query,
     Response,
 )
 from sqlalchemy.engine import Row as Row
@@ -39,7 +40,8 @@ AUTH0_API_AUDIENCE = os.environ.get("AUTH0_API_AUDIENCE", "")
 # set up an auth0 user
 
 
-class ExampleUser(auth.Auth0User): ...
+class ExampleUser(auth.Auth0User):
+    ...
 
 
 auth0 = auth.Auth0(
@@ -102,7 +104,22 @@ async def get_transaction() -> AsyncIterator[dal.TransactionManager]:
             raise HTTPException(status_code=500, detail="Server Error.")
 
 
-class BookQueryParams(models.ListViewQueryParamsModel): ...
+class BookQueryParams(models.ListViewQueryParamsModel):
+    ...
+
+
+# sanity check
+# this is to test out list[int] = Query(None, min_length=m, max_length=n)
+class BookQueryParamsMultiIds(models.ListViewQueryParamsModel):
+    def __init__(
+        self,
+        ids: list[int] = Query(..., min_length=1, max_length=5),
+        offset: int = Query(0, ge=0),
+        limit: int = Query(1000, ge=0, le=1000),
+    ):
+        self.ids = ids
+        self.offset = offset
+        self.limit = limit
 
 
 class BookUpdateForm(models.FormModel):
@@ -133,6 +150,31 @@ class ListViewQueryable(controllers.IListQueryable[BookQueryParams, ExampleUser]
     ) -> SaSelect:
         t = transaction.get_table(self.t)
         stmt = sa.select(t, helpers.sa_total_count(t.c.id)).order_by(t.c.id)
+
+        viewable_authors = where.user.get_permissions()
+
+        if viewable_authors is not None:
+            stmt = stmt.where(t.c.author_id.in_(viewable_authors))
+        return stmt
+
+
+class MultiIdsListViewQueryable(
+    controllers.IListQueryable[BookQueryParamsMultiIds, ExampleUser]
+):
+    def __init__(self, t: str):
+        self.t = t
+
+    def query_stmt(
+        self,
+        transaction: dal.TransactionManager,
+        where: context.ListContext[BookQueryParamsMultiIds, ExampleUser],
+    ) -> SaSelect:
+        t = transaction.get_table(self.t)
+        stmt = (
+            sa.select(t, helpers.sa_total_count(t.c.id))
+            .where(t.c.id.in_(where.query_params.ids))
+            .order_by(t.c.id)
+        )
 
         viewable_authors = where.user.get_permissions()
 
@@ -309,6 +351,24 @@ async def get_book_list(
     data = await controllers.ListViewController(q=ListViewQueryable("book")).query(
         transaction, ctx
     )
+    return BookListView.model_validate(data)
+
+
+# testing out multi ids
+@app.get(
+    "/book_multi_ids",
+    dependencies=[Depends(auth0.implicit_scheme)],
+)
+async def get_book_list_multi_ids(
+    request: Request,
+    params: BookQueryParamsMultiIds = Depends(),
+    user: ExampleUser = Security(auth0.get_user),
+    transaction: dal.TransactionManager = Depends(get_transaction),
+) -> BookListView:
+    ctx = context.ListContext(user=user, request=request, query_params=params)
+    data = await controllers.ListViewController(
+        q=MultiIdsListViewQueryable("book")
+    ).query(transaction, ctx)
     return BookListView.model_validate(data)
 
 

@@ -11,7 +11,9 @@ async def test_create_book_409_IntegrityError(
 ):
     app = module_test_app
     transaction = module_transaction
-    async with httpx.AsyncClient(app=app, base_url="https://fake.com") as client:
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="https://fake.com"
+    ) as client:
         path = app.url_path_for("create_book")
         response = await client.post(
             path,
@@ -31,7 +33,9 @@ async def test_patch_book_409_IntegrityError(
 ):
     app = module_test_app
     transaction = module_transaction
-    async with httpx.AsyncClient(app=app, base_url="https://fake.com") as client:
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="https://fake.com"
+    ) as client:
         obj_id = 1
         path = app.url_path_for("get_book_detail", id=obj_id)
         response = await client.get(
@@ -63,7 +67,9 @@ async def test_create_book_409_DBAPIError(
 ):
     app = module_test_app
     transaction = module_transaction
-    async with httpx.AsyncClient(app=app, base_url="https://fake.com") as client:
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="https://fake.com"
+    ) as client:
         mocker.patch(
             "aiodal.dal.TransactionManager.execute",
             side_effect=DBAPIError(
@@ -93,7 +99,9 @@ async def test_patch_book_409_DBAPIError(
 ):
     app = module_test_app
     transaction = module_transaction
-    async with httpx.AsyncClient(app=app, base_url="https://fake.com") as client:
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="https://fake.com"
+    ) as client:
         obj_id = 1
         path = app.url_path_for("get_book_detail", id=obj_id)
         response = await client.get(

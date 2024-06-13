@@ -7,7 +7,9 @@ pytestmark = pytest.mark.anyio
 
 async def test_get_book_list(module_test_app, module_authors, module_books):
     app = module_test_app
-    async with httpx.AsyncClient(app=app, base_url="https://fake.com") as client:
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="https://fake.com"
+    ) as client:
         path = app.url_path_for("get_book_list")
         response = await client.get(path)
         assert response.status_code == 200
@@ -19,7 +21,9 @@ async def test_get_book_list(module_test_app, module_authors, module_books):
 
 async def test_get_book_list_multi_ids(module_test_app, module_authors, module_books):
     app = module_test_app
-    async with httpx.AsyncClient(app=app, base_url="https://fake.com") as client:
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="https://fake.com"
+    ) as client:
         path = app.url_path_for("get_book_list_multi_ids")
 
         response = await client.get(path, params={"ids": [1]})
@@ -44,7 +48,9 @@ async def test_create_book(
 ):
     app = module_test_app
     transaction = module_transaction
-    async with httpx.AsyncClient(app=app, base_url="https://fake.com") as client:
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="https://fake.com"
+    ) as client:
         path = app.url_path_for("create_book")
         response = await client.post(
             path,
@@ -72,7 +78,9 @@ async def test_get_book_detail(
     module_test_app, module_transaction, module_authors, module_books
 ):
     app = module_test_app
-    async with httpx.AsyncClient(app=app, base_url="https://fake.com") as client:
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="https://fake.com"
+    ) as client:
         path = app.url_path_for("get_book_detail", id=1)
         response = await client.get(
             path,
@@ -94,7 +102,9 @@ async def test_patch_book(
 ):
     app = module_test_app
     transaction = module_transaction
-    async with httpx.AsyncClient(app=app, base_url="https://fake.com") as client:
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="https://fake.com"
+    ) as client:
         obj_id = 1
         path = app.url_path_for("get_book_detail", id=obj_id)
         response = await client.get(
@@ -159,7 +169,9 @@ async def test_soft_delete_book(
 ):
     app = module_test_app
     transaction = module_transaction
-    async with httpx.AsyncClient(app=app, base_url="https://fake.com") as client:
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="https://fake.com"
+    ) as client:
         obj_id = 2
         path = app.url_path_for("get_book_detail", id=obj_id)
         response = await client.get(
@@ -192,7 +204,9 @@ async def test_delete_book(
 ):
     app = module_test_app
     transaction = module_transaction
-    async with httpx.AsyncClient(app=app, base_url="https://fake.com") as client:
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="https://fake.com"
+    ) as client:
         obj_id = 1
         path = app.url_path_for("get_book_detail", id=obj_id)
         response = await client.get(

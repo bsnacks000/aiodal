@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from pydantic import Field
 
 from aiodal.web.auth import Auth0, Auth0User, security_responses
+import jwt
 
 
 ###############################################################################
@@ -18,30 +19,20 @@ auth = Auth0(domain="domain", api_audience="audience")
 auth_custom = Auth0(
     domain="domain", api_audience="audience", user_model=CustomAuth0User
 )
-auth.jwks = {
-    "keys": [
-        {
-            "kid": "veryrealkid",
-            "kty": "veryreal_kty",
-            "use": "veryreal_use",
-            "n": "veryreal_n",
-            "e": "veryreal_e",
-        }
-    ]
+
+_keys = {
+    "kid": "veryrealkid",
+    "kty": "RSA",
+    "use": "veryreal_use",
+    "n": "veryreal_n",
+    "e": "veryreal_e",
 }
-auth.algorithms = ["veryfast"]
-auth_custom.jwks = {
-    "keys": [
-        {
-            "kid": "veryrealkid",
-            "kty": "veryreal_kty",
-            "use": "veryreal_use",
-            "n": "veryreal_n",
-            "e": "veryreal_e",
-        }
-    ]
-}
-auth_custom.algorithms = ["veryfast"]
+
+
+auth.jwks = jwt.PyJWKClient("https://fake.url")
+auth.algorithms = ["RSA"]
+auth_custom.jwks = jwt.PyJWKClient("https://fake.url")
+auth_custom.algorithms = ["RSA"]
 app = FastAPI()
 
 

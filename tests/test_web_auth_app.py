@@ -1,9 +1,8 @@
 from .authapp import app, CustomAuth0User
-import base64
-import json
-from typing import Dict
+
 from fastapi.testclient import TestClient
 from aiodal.web.auth import Auth0User
+import jwt
 
 client = TestClient(app)
 
@@ -44,8 +43,22 @@ def test_private(mocker):
         "gty": "client-credentials",
         "org_id": "cia",
     }
-    mocker.patch("jose.jwt.get_unverified_header", return_value=unverified_header)
-    mocker.patch("jose.jwt.decode", return_value=payload)
+    mocker.patch("jwt.get_unverified_header", return_value=unverified_header)
+    mocker.patch("jwt.decode", return_value=payload)
+
+    keys = {
+        "kid": "veryrealkid",
+        "kty": "RSA",
+        "use": "veryreal_use",
+        "n": "veryreal_n",
+        "e": "veryreal_e",
+    }
+
+    mocker.patch.object(
+        jwt.PyJWKClient,
+        "get_signing_key_from_jwt",
+        return_value=jwt.PyJWK.from_dict(keys),
+    )
 
     headers = {"Authorization": "Bearer adfdf"}
     resp = client.get("/secure", headers=headers)

@@ -13,6 +13,7 @@ pytest = "^8.2.2"
 python = ">=3.9"
 fastapi = "^0.111"
 python-jose = "^3.3.0"
+pyjwt = {extras = ["crypto"], version = "^2.8.0"}
 
 [tool.poetry.group.dev.dependencies]
 alembic = "^1.13.1"

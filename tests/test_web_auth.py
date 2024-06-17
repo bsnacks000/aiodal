@@ -276,7 +276,7 @@ async def test_decode_token(mocker):
     mocker.patch("jose.jwt.get_unverified_header", return_value=unverified_header)
     mocker.patch("jose.jwt.decode", return_value=payload)
 
-    exp_payload = auth_._decode_token("token")
+    exp_payload = auth_._decode_token("token.token")
 
 
 async def test_decode_token_kid_missing_error(mocker):
@@ -290,7 +290,7 @@ async def test_decode_token_kid_missing_error(mocker):
     )
 
     with pytest.raises(auth.Auth0UnauthenticatedException):
-        auth_._decode_token("token")
+        auth_._decode_token("token.token")
 
 
 async def test_decode_token_kid_mismatch_error(mocker):
@@ -316,4 +316,4 @@ async def test_decode_token_kid_mismatch_error(mocker):
     auth_.jwks = jwks_
     mocker.patch("jose.jwt.get_unverified_header", return_value=unverified_header)
     with pytest.raises(auth.Auth0UnauthenticatedException):
-        auth_._decode_token("token")
+        auth_._decode_token("token.token")

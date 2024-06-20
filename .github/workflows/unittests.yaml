@@ -48,7 +48,7 @@ jobs:
         run: poetry run alembic upgrade head
 
       - name: Run tests
-        run: coverage run --source=aiodal/ -m pytest -s -v && coverage report -m --fail-under=90
+        run: coverage run --source=aiodal/ -m pytest -s -v -m "not e2e" && coverage report -m --fail-under=90
 
       - name: Run mypy
         run: poetry run mypy aiodal --strict

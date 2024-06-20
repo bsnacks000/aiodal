@@ -37,7 +37,7 @@ services:
         PGPASSWORD=postgres dropdb -h pgdb -p 5432 -U postgres -e -f --if-exists testdb && \
         PGPASSWORD=postgres createdb -h pgdb -p 5432 -U postgres -e testdb
         poetry run alembic upgrade head
-        coverage run --source=aiodal/ -m pytest -s -v && coverage report -m --fail-under=90
+        coverage run --source=aiodal/ -m pytest -s -v -m "not e2e" && coverage report -m --fail-under=90
         poetry run mypy aiodal --strict
         poetry run mypy tests/crudapp.py --strict
         PGPASSWORD=postgres dropdb -h pgdb -p 5432 -U postgres -e -f --if-exists testdb

@@ -216,9 +216,11 @@ AUTH0_TESTING_CLIENT_SECRET = os.environ.get("AUTH0_TESTING_CLIENT_SECRET")
 AUTH0_TESTING_CLIENT_ID = "DsfPLEIFU5Gn9qmhTuMnqiV8Irs3fUi3"
 
 
-@pytest.fixture(scope="module")
+# session so that token is fetched only once; will load only for e2e marked tests
+@pytest.fixture(scope="session")
 def authapp_access_token():
 
+    print("fetching again")
     cid = AUTH0_TESTING_CLIENT_ID
     sec = AUTH0_TESTING_CLIENT_SECRET
 

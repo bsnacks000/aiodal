@@ -31,3 +31,7 @@ requires = ["poetry-core"]
 
 [tool.poetry.plugins.pytest11]
 aiodal_plugin = "aiodal.pytest_plugin"
+
+
+[tool.pytest.ini_options]
+markers = ["e2e: mark end to end test"]

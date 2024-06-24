@@ -22,10 +22,12 @@ from os import PathLike
 import asyncpg
 from dataclasses import dataclass
 
+from asyncpg import Record
+
 
 class IOpExecutor(abc.ABC):
     @abc.abstractmethod
-    async def execute(self, conn: asyncpg.Connection) -> str: ...
+    async def execute(self, conn: asyncpg.Connection[Record]) -> str: ...
 
 
 class StmtOp(IOpExecutor):
@@ -40,7 +42,7 @@ class StmtOp(IOpExecutor):
     @abc.abstractmethod
     def stmt(self) -> str: ...
 
-    async def execute(self, conn: asyncpg.Connection) -> str:
+    async def execute(self, conn: asyncpg.Connection[Record]) -> str:
         return await conn.execute(self.stmt(), *self.execute_args, timeout=self.timeout)
 
 
@@ -99,7 +101,7 @@ class LoadOpHandler(IOpExecutor):
         self.source = source
         self.copy_kwargs = copy_kwargs
 
-    async def execute(self, conn: asyncpg.Connection) -> str:
+    async def execute(self, conn: asyncpg.Connection[Record]) -> str:
         out = ""
         result = await self.tmp.execute(conn)
         out += result + "\n"
@@ -153,7 +155,7 @@ class ExportOpHandler(IOpExecutor):
         self.query_args = query_args
         self.copy_kwargs = copy_kwargs
 
-    async def execute(self, conn: asyncpg.Connection) -> str:
+    async def execute(self, conn: asyncpg.Connection[Record]) -> str:
         return await conn.copy_from_query(
             self.query, *self.query_args, output=self.output, **self.copy_kwargs
         )

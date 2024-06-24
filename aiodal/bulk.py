@@ -16,6 +16,7 @@ Exporting is simpler and is controlled by a single query.
 
 """
 
+from __future__ import annotations
 import abc
 from typing import Any, AsyncIterable, BinaryIO, Sequence, Tuple, Callable, Coroutine
 from os import PathLike

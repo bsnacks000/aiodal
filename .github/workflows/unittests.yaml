@@ -33,11 +33,9 @@ jobs:
       POSTGRES_HOST: pgdb
       POSTGRES_PORT: 5432
       ENVIRONMENT: testing
+      AUTH0_TESTING_CLIENT_SECRET: ${{ secrets.AUTH0_TESTING_CLIENT_SECRET }}
 
     steps:
-      - name: checkout repo
-        uses: actions/checkout@v2
-
       - name: checkout repo
         uses: actions/checkout@v2
 
@@ -49,6 +47,9 @@ jobs:
 
       - name: Run tests
         run: coverage run --source=aiodal/ -m pytest -s -v -m "not e2e" && coverage report -m --fail-under=90
+
+      - name: Run e2e tests 
+        run: coverage run --source=aiodal/ -m pytest -s -v -m "e2e"
 
       - name: Run mypy
         run: poetry run mypy aiodal --strict

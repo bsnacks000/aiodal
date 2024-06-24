@@ -12,7 +12,9 @@ from typing import Optional, Dict, List, Any
 import urllib.parse
 import urllib.request
 
-from jose import jwt  # type: ignore
+# from jose import jwt  # type: ignore
+
+import jwt
 from fastapi import HTTPException, Depends, Request
 from .. import dal
 from fastapi.security import (
@@ -189,8 +191,16 @@ class Auth0:
 
     def initialize_jwks(self) -> None:
         self.algorithms = ["RS256"]
-        r = urllib.request.urlopen(f"https://{self.domain}/.well-known/jwks.json")
-        self.jwks: JwksDict = json.loads(r.read())
+
+        # i think this should be backwards compatible with the older impl .. caching jwks in
+        #  memory once on startup
+        # https://github.com/jpadilla/pyjwt/pull/781
+        # if we set cache_keys=False then it will cache with a TTL of 5 minutes and resend requests on expiry
+        # we would need to experiment with switching to this behavior.
+        # https://github.com/jpadilla/pyjwt/issues/615
+        jwks_url = f"https://{self.domain}/.well-known/jwks.json"
+        self.jwks = jwt.PyJWKClient(jwks_url, cache_keys=True)
+        self.jwks.fetch_data()  # <--- should only fetch once on startup
 
     async def get_user(
         self,
@@ -208,13 +218,9 @@ class Auth0:
         Example: def path_op_func(user: Auth0User = Security(auth.get_user)).
         """
         if creds is None:
-            # See HTTPBearer from FastAPI:
-            # latest - https://github.com/tiangolo/fastapi/blob/master/fastapi/security/http.py
-            # 0.65.1 - https://github.com/tiangolo/fastapi/blob/aece74982d7c9c1acac98e2c872c4cb885677fc7/fastapi/security/http.py
-            # must be 403 until solving https://github.com/tiangolo/fastapi/pull/2120
             raise HTTPException(403, detail="Missing bearer token")
         token = creds.credentials
-        payload: Dict[str, Any] = {}
+
         try:
             payload = self._decode_token(token)
 
@@ -225,16 +231,14 @@ class Auth0:
                 self.check_for_scopes(security_scopes, payload)
 
             return self._parse_user_from_payload(payload)
+
         except jwt.ExpiredSignatureError:
             raise Auth0UnauthenticatedException(detail="Expired token")
 
-        except jwt.JWTClaimsError:
+        except jwt.MissingRequiredClaimError:
             raise Auth0UnauthenticatedException(
                 detail="Invalid token claims (wrong issuer or audience)"
             )
-
-        except jwt.JWTError:
-            raise Auth0UnauthenticatedException(detail="Malformed token")
 
         except Auth0UnauthenticatedException:
             raise
@@ -253,31 +257,26 @@ class Auth0:
         if "kid" not in unverified_header:
             raise Auth0UnauthenticatedException(detail="Malformed token header")
 
-        payload: Dict[str, Any] = {}  # shutup mypy
-        rsa_key = {}
-        for key in self.jwks["keys"]:
-            if key["kid"] == unverified_header["kid"]:
-                rsa_key = {
-                    "kty": key["kty"],
-                    "kid": key["kid"],
-                    "use": key["use"],
-                    "n": key["n"],
-                    "e": key["e"],
-                }
-                break
-        if rsa_key:
-            payload = jwt.decode(
+        try:
+            key = self.jwks.get_signing_key_from_jwt(token).key
+        except jwt.PyJWKClientError as err:
+            raise Auth0UnauthorizedException(
+                detail=f"Error getting signing key: {str(err)}"
+            )
+
+        try:
+            payload: Dict[str, Any] = jwt.decode(
                 token,
-                rsa_key,
+                key,
                 algorithms=self.algorithms,
                 audience=self.audience,
                 issuer=f"https://{self.domain}/",
             )
             return payload
-        else:
-            raise Auth0UnauthenticatedException(
-                detail="Invalid kid header (wrong tenant or rotated public key)"
-            )
+
+        # this call can throw so many errors its better to just catch this guy...
+        except jwt.PyJWTError as err:
+            raise Auth0UnauthorizedException(detail=f"Error decoding token: {str(err)}")
 
     def _parse_user_from_payload(self, payload: Dict[str, Any]) -> Auth0User:
         try:

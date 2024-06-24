@@ -1,9 +1,9 @@
 # only need this to make a mock app for testing aiodal.web.auth
 
-from typing import Dict, Optional
+from typing import Optional, AsyncGenerator, Any
 from fastapi import FastAPI, Depends, Security
-from fastapi.testclient import TestClient
 from pydantic import Field
+from contextlib import asynccontextmanager
 
 from aiodal.web.auth import Auth0, Auth0User, security_responses
 
@@ -14,38 +14,27 @@ class CustomAuth0User(Auth0User):
 
 
 ###############################################################################
-auth = Auth0(domain="domain", api_audience="audience")
+AUTH0_TESTING_DOMAIN = "dev-qfnm6uuqxtjs3l44.us.auth0.com"
+AUTH0_TESTING_API_AUDIENCE = "https://testing.api"
+
+auth = Auth0(domain=AUTH0_TESTING_DOMAIN, api_audience=AUTH0_TESTING_API_AUDIENCE)
 auth_custom = Auth0(
-    domain="domain", api_audience="audience", user_model=CustomAuth0User
+    domain=AUTH0_TESTING_DOMAIN,
+    api_audience=AUTH0_TESTING_API_AUDIENCE,
+    user_model=CustomAuth0User,
 )
-auth.jwks = {
-    "keys": [
-        {
-            "kid": "veryrealkid",
-            "kty": "veryreal_kty",
-            "use": "veryreal_use",
-            "n": "veryreal_n",
-            "e": "veryreal_e",
-        }
-    ]
-}
-auth.algorithms = ["veryfast"]
-auth_custom.jwks = {
-    "keys": [
-        {
-            "kid": "veryrealkid",
-            "kty": "veryreal_kty",
-            "use": "veryreal_use",
-            "n": "veryreal_n",
-            "e": "veryreal_e",
-        }
-    ]
-}
-auth_custom.algorithms = ["veryfast"]
-app = FastAPI()
 
 
-# set ups for testing auth functionality
+@asynccontextmanager
+async def lifespan(
+    app: FastAPI,
+) -> AsyncGenerator[Any, Any]:
+    auth.initialize_jwks()
+    auth_custom.initialize_jwks()
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 
 @app.get("/public")

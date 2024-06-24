@@ -28,6 +28,8 @@ services:
       dockerfile: ./Dockerfile
     volumes:
       - .:/app
+    environment:
+      - AUTH0_TESTING_CLIENT_SECRET=${AUTH0_TESTING_CLIENT_SECRET}
     command:
       - /bin/sh
       - -c

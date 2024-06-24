@@ -6,6 +6,7 @@ from aiodal.dal import DataAccessLayer, TransactionManager
 import logging
 import sqlalchemy as sa
 from . import crudapp
+from .authapp import AUTH0_TESTING_API_AUDIENCE, AUTH0_TESTING_DOMAIN
 import json
 import pathlib
 
@@ -205,3 +206,35 @@ async def books_fixture(module_transaction):
         .returning(tab)
     )
     await module_transaction.execute(stmt)
+
+
+# auth0 app related fixture
+import httpx
+import os
+
+AUTH0_TESTING_CLIENT_SECRET = os.environ.get("AUTH0_TESTING_CLIENT_SECRET")
+AUTH0_TESTING_CLIENT_ID = "DsfPLEIFU5Gn9qmhTuMnqiV8Irs3fUi3"
+
+
+# session so that token is fetched only once; will load only for e2e marked tests
+@pytest.fixture(scope="session")
+def authapp_access_token():
+    cid = AUTH0_TESTING_CLIENT_ID
+    sec = AUTH0_TESTING_CLIENT_SECRET
+
+    domain = AUTH0_TESTING_DOMAIN
+    audience = AUTH0_TESTING_API_AUDIENCE
+
+    token_url = f"https://{domain}/oauth/token"
+    assert cid, "client id for auth0 must be set"
+    assert sec, "secret for auth0 must be set"
+    data = {
+        "client_id": cid,
+        "client_secret": sec,
+        "audience": audience,
+        "grant_type": "client_credentials",
+    }
+    res = httpx.post(token_url, data=data)
+    assert res.status_code == 200, "access token cannot be fetched"
+    token = res.json()["access_token"]
+    return token

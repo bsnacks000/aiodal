@@ -1,4 +1,3 @@
-# type: ignore
 """ An interface for using bulk insert/upsert/export via asyncpg `COPY`.
 These are essentially wrappers around asyncpg.Connection.copy_to_table and asyncpg.Connection.copy_from_query
 
@@ -16,6 +15,7 @@ Exporting is simpler and is controlled by a single query.
 1. Export using copy given a specific query to a file / stdout.
 
 """
+
 import abc
 from typing import Any, AsyncIterable, BinaryIO, Sequence, Tuple, Callable, Coroutine
 from os import PathLike
@@ -25,8 +25,7 @@ from dataclasses import dataclass
 
 class IOpExecutor(abc.ABC):
     @abc.abstractmethod
-    async def execute(self, conn: asyncpg.Connection) -> str:
-        ...
+    async def execute(self, conn: asyncpg.Connection) -> str: ...
 
 
 class StmtOp(IOpExecutor):
@@ -39,11 +38,10 @@ class StmtOp(IOpExecutor):
         self.timeout = timeout
 
     @abc.abstractmethod
-    def stmt(self) -> str:
-        ...
+    def stmt(self) -> str: ...
 
     async def execute(self, conn: asyncpg.Connection) -> str:
-        return await conn.execute(self.stmt(), *self.execute_args, timeout=self.timeout)  # type: ignore[no-any-return]
+        return await conn.execute(self.stmt(), *self.execute_args, timeout=self.timeout)
 
 
 @dataclass
@@ -156,6 +154,6 @@ class ExportOpHandler(IOpExecutor):
         self.copy_kwargs = copy_kwargs
 
     async def execute(self, conn: asyncpg.Connection) -> str:
-        return await conn.copy_from_query(  # type: ignore[no-any-return]
+        return await conn.copy_from_query(
             self.query, *self.query_args, output=self.output, **self.copy_kwargs
         )

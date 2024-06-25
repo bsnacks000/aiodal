@@ -3,7 +3,7 @@ authors = ["bsnacks000 <bsnacks000@gmail.com>"]
 description = "asyncpg sqla data access layer and related tools"
 name = "aiodal"
 readme = "README.md"
-version = "0.7.0"
+version = "0.7.1"
 
 [tool.poetry.dependencies]
 SQLAlchemy = "^2.0.25"

@@ -5,6 +5,7 @@ Revises: 74d1ce0ca025
 Create Date: 2024-01-25 14:26:52.488244
 
 """
+
 from alembic import op
 import sqlalchemy as sa
 
@@ -33,5 +34,4 @@ def upgrade() -> None:
     op.add_column("author", sa.Column("deleted", sa.Boolean, server_default="f"))
 
 
-def downgrade() -> None:
-    pass
+def downgrade() -> None: ...

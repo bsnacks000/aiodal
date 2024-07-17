@@ -121,28 +121,6 @@ class LoadOpHandler(IOpExecutor):
         return out
 
 
-class BulkLoadScript:
-    def __init__(
-        self,
-        url: str,
-        ops: Sequence[LoadOpHandler],
-        verbose: bool = True,
-        **connect_kwargs: Any,
-    ):
-        self.url = url
-        self.ops = ops
-        self.verbose = verbose
-        self.connect_kwargs = connect_kwargs
-
-    async def run(self, verbose: bool = True) -> None:
-        conn = await asyncpg.connect(self.url, **self.connect_kwargs)
-        async with conn.transaction():
-            for op in self.ops:
-                result = await op.execute(conn)
-                if verbose:
-                    print(result)
-
-
 class ExportOpHandler(IOpExecutor):
     def __init__(
         self,

@@ -6,6 +6,9 @@ from aiodal import dal, connect
 pytestmark = pytest.mark.anyio
 
 
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
+
+
 async def test_dal_basics(transaction):
     author = transaction.get_table("author")
     book = transaction.get_table("book")
@@ -45,6 +48,8 @@ async def test_dal_basics(transaction):
 
 
 async def test_dal_setters_getters(engine_uri, transaction):
+
+    assert isinstance(transaction, dal.TransactionManager)
     db = await connect.or_fail(url=engine_uri, with_exit=False)
     tablename = "Table name"
     value = "Testing value"
@@ -69,6 +74,10 @@ async def test_dal_setters_getters(engine_uri, transaction):
 
     book_constraint = db.get_unique_constraint("book")
     assert book_constraint == ["catalog"]
+
+    assert isinstance(transaction.conn, AsyncConnection)
+
+    assert isinstance(transaction.engine, AsyncEngine)
 
 
 async def test_dal_transaction_context(engine_uri, transaction):

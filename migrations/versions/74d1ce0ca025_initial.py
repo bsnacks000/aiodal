@@ -5,6 +5,7 @@ Revises:
 Create Date: 2023-02-15 08:31:37.385944
 
 """
+
 from alembic import op
 import sqlalchemy as sa
 
@@ -74,11 +75,4 @@ def upgrade() -> None:
     )
 
 
-def downgrade() -> None:
-    op.drop_table("author")
-    op.drop_table("book")
-    op.drop_table("testschema1.table1")
-    op.drop_table("testschema1.table2")
-    op.drop_table("testschema2.table1")
-    op.execute("drop schema testschema1")
-    op.execute("drop schema testschema2")
+def downgrade() -> None: ...

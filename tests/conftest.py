@@ -88,7 +88,7 @@ async def listschema_db(async_engine: AsyncEngine) -> AsyncIterator[DataAccessLa
 
     try:
         db = DataAccessLayer()
-        await db.reflect(async_engine, schema=["testschema1", "testschema2"])
+        await db.reflect(async_engine, schema=["testschema1", "testschema2", "w"])
         yield db
     except Exception as err:
         logger.exception(err)

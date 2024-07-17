@@ -1,4 +1,4 @@
-FROM bsnacks000/python-poetry:3.11-1.3.2 
+FROM bsnacks000/python-poetry:3.12.4-slim
 
 RUN mkdir app 
 WORKDIR /app 

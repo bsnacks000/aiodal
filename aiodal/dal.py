@@ -12,7 +12,6 @@ from sqlalchemy.engine.interfaces import (
 from collections.abc import Iterable
 
 from typing import Dict, Sequence
-import itertools
 
 
 class DataAccessLayer(object):
@@ -191,6 +190,14 @@ class TransactionManager(object):
         self._db = db
         self._aliased_tables: Dict[str, sa.TableValuedAlias] = {}
 
+    @property
+    def conn(self) -> AsyncConnection:
+        return self._conn
+
+    @property
+    def engine(self) -> AsyncEngine:
+        return self._db.engine
+
     def set_aliased(self, name: str, t: sa.TableValuedAlias) -> None:
         """Set an aliased table on the transaction itself. This is allows us to use functions we define for select statements
         easily. This does not overwrite any aliased tables set in the underlying DataAccessLayer.
@@ -241,6 +248,27 @@ class TransactionManager(object):
             List[str]: List of column names
         """
         return self._db.get_unique_constraint(tablename)
+
+    async def get_dbapi_connection(self) -> Any | None:
+        """Shortcut for returning the underlying dbapi driver connection.
+        This cuts out several proxy layers.  Handle with care.
+
+        From https://docs.sqlalchemy.org/en/20/faq/connections.html#accessing-the-underlying-connection-for-an-asyncio-driver/
+
+        According to the docs this raw connection is returned to the pool just like any other
+        sqlalchemy connection. The execution options should not be modified or we could poison the
+        connection pool.
+
+        NOTE that that execute commands on this raw connection will _NOT_ automatically be
+        part of the open sqla transaction that TransactionManager governs. If multiple statements
+        need to be executed by this connection you should use the driver to open a nested transaction and
+        allow any errors to propagate.
+
+        Returns:
+            Any | None: Generic raw driver. Should assert type before use.
+        """
+        fairy = await self._conn.get_raw_connection()
+        return fairy.driver_connection
 
     async def execute(
         self,

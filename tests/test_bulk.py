@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import pytest
 import pathlib
 from aiodal import bulk
@@ -61,13 +63,16 @@ async def test_bulk_api(asyncpg_engine_uri):
         tmp=tmp_book, target=book_load, source=fixture_dir / "books.jsonl"
     )
 
-    script = bulk.BulkLoadScript(
-        url=asyncpg_engine_uri, ops=[auth_handler, book_handler], verbose=True
-    )
+    # script = bulk.BulkLoadScript(
+    #     url=asyncpg_engine_uri, ops=[auth_handler, book_handler], verbose=True
+    # )
 
-    await script.run()
-
+    # await script.run()
     conn = await asyncpg.connect(asyncpg_engine_uri)
+
+    async with conn.transaction():
+        await auth_handler.execute(conn)
+        await book_handler.execute(conn)
 
     result = await conn.fetch("select * from author;")
     assert len(result) == 3

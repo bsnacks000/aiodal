@@ -1,3 +1,7 @@
+
+*.csv
+!tests/fixtures/*.csv
+
 .pytest_cache/
 *.ipynb
 *.zip
@@ -6,7 +10,6 @@ data/
 sample.json
 
 *.sqlite3
-*.csv
 .DS_Store
 *.vscode
 

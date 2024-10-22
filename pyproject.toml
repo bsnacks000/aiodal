@@ -10,6 +10,7 @@ SQLAlchemy = "^2.0.35"
 anyio = "^4.4.0"
 asyncpg = "^0.29.0"
 asyncpg-stubs = "^0.29.1"
+starlette = ">=0.40.0"
 fastapi = "^0.115.2"
 cryptography= "^43.0.1"
 pyjwt = {extras = ["crypto"], version = "^2.9.0"}

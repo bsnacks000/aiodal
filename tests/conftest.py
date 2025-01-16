@@ -6,7 +6,7 @@ from aiodal.dal import DataAccessLayer, TransactionManager
 import logging
 import sqlalchemy as sa
 from . import crudapp
-from .authapp import AUTH0_TESTING_API_AUDIENCE, AUTH0_TESTING_DOMAIN
+from .authapp import AUTH0_TESTING_API_AUDIENCE, AUTH0_TESTING_DOMAIN, WEBHOOK_URL
 import json
 import pathlib
 
@@ -213,7 +213,7 @@ import httpx
 import os
 
 AUTH0_TESTING_CLIENT_SECRET = os.environ.get("AUTH0_TESTING_CLIENT_SECRET")
-AUTH0_TESTING_CLIENT_ID = "DsfPLEIFU5Gn9qmhTuMnqiV8Irs3fUi3"
+AUTH0_TESTING_CLIENT_ID = os.environ.get("AUTH0_TESTING_CLIENT_ID")
 
 
 # session so that token is fetched only once; will load only for e2e marked tests
@@ -235,6 +235,6 @@ def authapp_access_token():
         "grant_type": "client_credentials",
     }
     res = httpx.post(token_url, data=data)
-    assert res.status_code == 200, "access token cannot be fetched"
+    assert res.status_code == 200, f"access token cannot be fetched for {cid}"
     token = res.json()["access_token"]
     return token

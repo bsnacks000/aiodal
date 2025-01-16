@@ -29,6 +29,8 @@ services:
       - .:/app
     environment:
       - AUTH0_TESTING_CLIENT_SECRET=${AUTH0_TESTING_CLIENT_SECRET}
+      - AUTH0_TESTING_CLIENT_ID=${AUTH0_TESTING_CLIENT_ID}
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
     command:
       - /bin/sh
       - -c

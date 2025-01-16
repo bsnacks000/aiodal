@@ -34,6 +34,13 @@ def test_public():
 
 
 @pytest.mark.e2e
+def test_public_error():
+    with TestClient(app) as client:
+        with pytest.raises(ValueError):
+            resp = client.get("/error")
+
+
+@pytest.mark.e2e
 def test_private(authapp_access_token):
     client_id = AUTH0_TESTING_CLIENT_ID
     with TestClient(app) as client:
@@ -47,6 +54,8 @@ def test_private(authapp_access_token):
         resp2 = client.get("/also-secure-2", headers=headers)
         assert resp2.status_code == 200, resp2.text
 
+        # XXX permissions does not come back with scope anymore;
+        # if we need scope info in user model, we will need to provide it
         user = Auth0User(**resp.json())
         assert client_id in user.id  # assert client_id
         assert user.permissions == ["read:scope1"]

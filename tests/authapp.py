@@ -40,9 +40,11 @@ async def lifespan(
 
 
 app = FastAPI(lifespan=lifespan)
+# slack_notifier obj
 slack_notifier = SlackNotifier(auth0_model=auth, webhook_url=WEBHOOK_URL)
 
 
+# add slack_notifier as middileware
 @app.middleware("http")
 async def slack_notify_middleware(request: Request, call_next: Any):  # type: ignore
     try:

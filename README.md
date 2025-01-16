@@ -80,4 +80,55 @@ See `tests/test_bulk.py` for an example of how to set up ETL with `bulk` classes
 
 ## web 
 
-__TODO__
+
+#### slack notifier
+
+Below demonstrates adding slack notifier as middleware to log unhandle error responses from routes and internals
+
+```python
+# authentication set up
+auth = Auth0(domain=AUTH0_TESTING_DOMAIN, api_audience=AUTH0_TESTING_API_AUDIENCE)
+app = FastAPI(lifespan=lifespan)
+# slack_notifier obj
+slack_notifier = SlackNotifier(auth0_model=auth, webhook_url=WEBHOOK_URL)
+
+
+# add slack_notifier as middileware
+@app.middleware("http")
+async def slack_notify_middleware(request: Request, call_next: Any):  # type: ignore
+    try:
+        response = await call_next(request)
+    except Exception as err:
+        await slack_notifier.slack_notify(request, err, "testing")
+        raise  # let starlette handle it with a plain 500
+    return response
+
+
+@app.get("/error")
+async def endpoint_with_error():
+    raise ValueError("hello from aiodal testing!") 
+    # return {"message": "Anonymous user"}
+```
+Above, if `/error` route is called, it will raise error and the error will get sent to appropriate channel in slack pointed by `WEBHOOK_URL`. `auth` will provide user information on who's caused the error.
+
+Moreover, one can construct a route to foward error into slack with `aiodal.web.slack_notify.send_slack_message`
+```python
+router = APIRouter(prefix="/slack")
+
+class SlackLogger(pydantic.BaseModel):
+    blocks: list[Any]
+
+
+@router.post("/", status_code=204)
+async def forward_slack_logger(
+    payload: SlackLogger,
+    _: HiveAuth0User = Security(auth0.get_user),
+) -> Response:
+    response = await send_slack_message(_WEBHOOK_URL, blocks=payload.blocks)
+    if response.status_code != 200:
+        logger.error(
+            f"Slack webhook call failed with status code {response.status_code}\n {response.text}"
+        )
+        return Response(content=response.text, status_code=response.status_code)
+    return Response(status_code=204)
+```

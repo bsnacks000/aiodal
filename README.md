@@ -86,11 +86,13 @@ See `tests/test_bulk.py` for an example of how to set up ETL with `bulk` classes
 Below demonstrates adding slack notifier as middleware to log unhandle error responses from routes and internals
 
 ```python
+from aiodal.web.slack_notify import SlackNotifier
+from aiodal.web.auth import Auth0
 # authentication set up
 auth = Auth0(domain=AUTH0_TESTING_DOMAIN, api_audience=AUTH0_TESTING_API_AUDIENCE)
 app = FastAPI(lifespan=lifespan)
 # slack_notifier obj
-slack_notifier = SlackNotifier(auth0_model=auth, webhook_url=WEBHOOK_URL)
+slack_notifier = SlackNotifier(authentication=auth, webhook_url=WEBHOOK_URL, environtments_trigger=["testing"])
 
 
 # add slack_notifier as middileware
@@ -113,16 +115,12 @@ Above, if `/error` route is called, it will raise error and the error will get s
 
 Moreover, one can construct a route to foward error into slack with `aiodal.web.slack_notify.send_slack_message`
 ```python
+from aiodal.web.slack_notify import SlackLogger, send_slack_message
 router = APIRouter(prefix="/slack")
-
-class SlackLogger(pydantic.BaseModel):
-    blocks: list[Any]
-
 
 @router.post("/", status_code=204)
 async def forward_slack_logger(
     payload: SlackLogger,
-    _: HiveAuth0User = Security(auth0.get_user),
 ) -> Response:
     response = await send_slack_message(_WEBHOOK_URL, blocks=payload.blocks)
     if response.status_code != 200:

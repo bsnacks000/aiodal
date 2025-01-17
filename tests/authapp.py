@@ -41,7 +41,9 @@ async def lifespan(
 
 app = FastAPI(lifespan=lifespan)
 # slack_notifier obj
-slack_notifier = SlackNotifier(auth0_model=auth, webhook_url=WEBHOOK_URL)
+slack_notifier = SlackNotifier(
+    authentication=auth, webhook_url=WEBHOOK_URL, environments_trigger=["testing"]
+)
 
 
 # add slack_notifier as middileware
@@ -61,8 +63,8 @@ async def get_public():
 
 
 @app.get("/error")
-async def get_raise_error():
-    raise ValueError("hello from aiodal testing!")
+async def get_raise_error_public():
+    raise ValueError("hello from aiodal testing but public!")
     # return {"message": "Anonymous user"}
 
 
@@ -85,6 +87,11 @@ async def get_secure(user: Auth0User = Security(auth.get_user)):
 @app.get("/also-secure")
 async def get_also_secure(user: Auth0User = Security(auth.get_user)):
     return user
+
+
+@app.get("/also-secure-error")
+async def get_also_secure_with_error(user: Auth0User = Security(auth.get_user)):
+    raise ValueError("hello from aiodal testing but private!")
 
 
 @app.get("/also-secure-2", dependencies=[Depends(auth.get_user)])

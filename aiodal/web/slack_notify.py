@@ -37,20 +37,35 @@ async def send_slack_message(
 
 
 class SlackNotifier:
-    auth0_model: auth.Auth0
+    authentication: auth.Auth0 | None = None
     webhook_url: str | None = None
-    # environment: str | None = None
+    environment: List[str] | None = None
 
-    def __init__(self, auth0_model: auth.Auth0, webhook_url: str):
-        self.auth0_model = auth0_model
+    def __init__(
+        self,
+        webhook_url: str,
+        authentication: auth.Auth0 | None = None,
+        environments_trigger: List[str] | None = None,
+    ):
         self.webhook_url = webhook_url
-        # self.environment = environment
+        self.authentication = authentication
+        self.environments_trigger = environments_trigger
 
     async def slack_notify(
         self, req: Request, exc: Exception, environment: str
     ) -> None:
-        # i dont think we need env in if stmt here
-        if self.webhook_url:
+        """public method to send notification of errors/messages into slack channel.
+
+        Args:
+            req (Request): request object
+            exc (Exception): exception raised that needs to be notified in slack
+            environment (str): an optional enviroment str. `environments_trigger` must be set in the class to use this.
+                                if the provided `environment` is not present in `environments_trigger`, messaages will not be sent to slack.
+
+        Returns:
+            _type_: _description_
+        """
+        if self.webhook_url and self._trigger_on_environment(environment):
             url = await self._configure_request_url(req)
             msg = self._configure_exception_message(url, exc)
             payload = await self._generate_slack_log_msg(req, url, msg, environment)
@@ -58,6 +73,33 @@ class SlackNotifier:
                 self.webhook_url, environment, payload=payload
             )
         return None
+
+    def _trigger_on_environment(self, environment: str) -> bool:
+        if not self.environments_trigger:
+            return True
+        return environment in self.environments_trigger
+
+    def _get_user_email(self, req: Request) -> str:
+        """get or parse user eamil from request if authorization is present in headers and authentication is provided in class constructor
+
+        Args:
+            req (Request): _description_
+        """
+        email: str
+        #  if auth is provided and there is Authorization in request headers, parse user info
+        # NOTE we should not need error handling here since if we had a malformed token
+        # it would have thrown already.
+        if self.authentication and "Authorization" in req.headers:
+            token = req.headers["Authorization"].split("Bearer ")[-1]
+            user_payload = self.authentication._decode_token(token)
+            email = (
+                user_payload["email"]
+                if "email" in user_payload.keys()
+                else "Authenticated User (no email)"
+            )
+        else:
+            email = "Unauthenticated User"
+        return email
 
     async def _generate_slack_log_msg(
         self,
@@ -79,17 +121,8 @@ class SlackNotifier:
         Returns:
             str: _description_
         """
-        # NOTE we should not need error handling here since if we had a malformed token
-        # it would have thrown already.
 
-        try:
-            token = req.headers["Authorization"].split("Bearer ")[-1]
-            user_payload = self.auth0_model._decode_token(token)
-            email = user_payload["email"]
-            # user = HiveAuth0User(**payload)
-            # email = user.email
-        except KeyError:
-            email = "Unauthenticated User."
+        email = self._get_user_email(req)
 
         # construct request info
         body = await req.body()
@@ -167,23 +200,6 @@ class SlackNotifier:
         return (
             f'"{url}"\n<{exception_name}: {exception_value}> \n {exception_traceback}'
         )
-
-
-# async def slack_notify(req: Request, exc: Exception, config: SlackConfig) -> None:
-#     """Fire the slack notify if we had an error. This is called in main from a starlette middleware
-#     wrapper. It should intercept any unhandled server side exceptions.
-
-#     Args:
-#         req (Request): _description_
-#         exc (Exception): _description_
-#     """
-#     if config.webhook_url and config.environment:
-#         url = await _configure_request_url(req)
-#         msg = _configure_exception_message(url, exc)
-#         payload = await _generate_slack_log_msg(req, url, msg, config.environment)
-#         await _slack_webhook_handler(config.webhook_url, config.environment, payload=payload)
-
-#     return None
 
 
 # NOTE this is only used in the forward logger calls from the frontend ..

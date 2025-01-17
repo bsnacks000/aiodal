@@ -13,7 +13,9 @@ pytestmark = pytest.mark.anyio
 
 
 dummy_auth = Auth0(domain="", api_audience="")
-slack_notifier = SlackNotifier(auth0_model=dummy_auth, webhook_url=WEBHOOK_URL)
+slack_notifier = SlackNotifier(
+    authentication=dummy_auth, webhook_url=WEBHOOK_URL, environments_trigger=["testing"]
+)
 
 
 class DummyURL:
@@ -102,6 +104,27 @@ async def test_generate_slack_log_msg(mocker):
     await slack_notifier._generate_slack_log_msg(
         dummy_request, url=dummy_url.path, msg="dum dum", env="testing"
     )
+
+
+async def test_slack_notify_enviroment_trigger(respx_mock):
+    dummy_notifier = SlackNotifier(
+        authentication=Auth0(domain="", api_audience=""),
+        webhook_url="",
+        environments_trigger=["testing", "staging"],
+    )
+
+    assert dummy_notifier._trigger_on_environment("testing")
+    assert dummy_notifier._trigger_on_environment("production") == False
+    assert dummy_notifier._trigger_on_environment("") == False
+
+    # no trigger so everything pass
+    dummy_notifier = SlackNotifier(
+        authentication=Auth0(domain="", api_audience=""),
+        webhook_url="",
+    )
+
+    assert dummy_notifier._trigger_on_environment("testing")
+    assert dummy_notifier._trigger_on_environment("")
 
 
 async def test_generate_slack_log_msg_without_header(mocker):

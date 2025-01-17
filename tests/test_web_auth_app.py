@@ -36,8 +36,19 @@ def test_public():
 @pytest.mark.e2e
 def test_public_error():
     with TestClient(app) as client:
+        # will set email as unauthenticated user since no header
         with pytest.raises(ValueError):
             resp = client.get("/error")
+
+
+# get_also_secure_with_error
+@pytest.mark.e2e
+def test_private_error(authapp_access_token):
+    with TestClient(app) as client:
+        # will set email as authenticated user or the actual email from payload in slack channel
+        with pytest.raises(ValueError):
+            headers = {"Authorization": f"Bearer {authapp_access_token}"}
+            resp = client.get("/also-secure-error", headers=headers)
 
 
 @pytest.mark.e2e

@@ -1,11 +1,13 @@
 # only need this to make a mock app for testing aiodal.web.auth
 
 from typing import Optional, AsyncGenerator, Any
-from fastapi import FastAPI, Depends, Security
+from fastapi import FastAPI, Depends, Security, Request, HTTPException
 from pydantic import Field
 from contextlib import asynccontextmanager
 
 from aiodal.web.auth import Auth0, Auth0User, security_responses
+from aiodal.web.slack_notify import SlackNotifier, send_slack_message
+import os
 
 
 ###############################################################################
@@ -14,8 +16,11 @@ class CustomAuth0User(Auth0User):
 
 
 ###############################################################################
+
 AUTH0_TESTING_DOMAIN = "dev-qfnm6uuqxtjs3l44.us.auth0.com"
-AUTH0_TESTING_API_AUDIENCE = "https://testing.api"
+AUTH0_TESTING_API_AUDIENCE = "https://aiodal.ci.dev"
+WEBHOOK_URL = os.environ.get("SLACK_WEBHOOK_URL")
+
 
 auth = Auth0(domain=AUTH0_TESTING_DOMAIN, api_audience=AUTH0_TESTING_API_AUDIENCE)
 auth_custom = Auth0(
@@ -35,11 +40,32 @@ async def lifespan(
 
 
 app = FastAPI(lifespan=lifespan)
+# slack_notifier obj
+slack_notifier = SlackNotifier(
+    authentication=auth, webhook_url=WEBHOOK_URL, environments_trigger=["testing"]
+)
+
+
+# add slack_notifier as middileware
+@app.middleware("http")
+async def slack_notify_middleware(request: Request, call_next: Any):  # type: ignore
+    try:
+        response = await call_next(request)
+    except Exception as err:
+        await slack_notifier.slack_notify(request, err, "testing")
+        raise  # let starlette handle it with a plain 500
+    return response
 
 
 @app.get("/public")
 async def get_public():
     return {"message": "Anonymous user"}
+
+
+@app.get("/error")
+async def get_raise_error_public():
+    raise ValueError("hello from aiodal testing but public!")
+    # return {"message": "Anonymous user"}
 
 
 @app.get("/also-public", dependencies=[Depends(auth.implicit_scheme)])
@@ -61,6 +87,11 @@ async def get_secure(user: Auth0User = Security(auth.get_user)):
 @app.get("/also-secure")
 async def get_also_secure(user: Auth0User = Security(auth.get_user)):
     return user
+
+
+@app.get("/also-secure-error")
+async def get_also_secure_with_error(user: Auth0User = Security(auth.get_user)):
+    raise ValueError("hello from aiodal testing but private!")
 
 
 @app.get("/also-secure-2", dependencies=[Depends(auth.get_user)])

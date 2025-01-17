@@ -34,6 +34,24 @@ def test_public():
 
 
 @pytest.mark.e2e
+def test_public_error():
+    with TestClient(app) as client:
+        # will set email as unauthenticated user since no header
+        with pytest.raises(ValueError):
+            resp = client.get("/error")
+
+
+# get_also_secure_with_error
+@pytest.mark.e2e
+def test_private_error(authapp_access_token):
+    with TestClient(app) as client:
+        # will set email as authenticated user or the actual email from payload in slack channel
+        with pytest.raises(ValueError):
+            headers = {"Authorization": f"Bearer {authapp_access_token}"}
+            resp = client.get("/also-secure-error", headers=headers)
+
+
+@pytest.mark.e2e
 def test_private(authapp_access_token):
     client_id = AUTH0_TESTING_CLIENT_ID
     with TestClient(app) as client:
@@ -47,6 +65,8 @@ def test_private(authapp_access_token):
         resp2 = client.get("/also-secure-2", headers=headers)
         assert resp2.status_code == 200, resp2.text
 
+        # XXX permissions does not come back with scope anymore;
+        # if we need scope info in user model, we will need to provide it
         user = Auth0User(**resp.json())
         assert client_id in user.id  # assert client_id
         assert user.permissions == ["read:scope1"]

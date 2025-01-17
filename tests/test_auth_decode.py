@@ -13,7 +13,6 @@ class DummyUser(auth.Auth0User): ...
 
 @pytest.mark.e2e
 async def test_decode_token(authapp_access_token):
-
     access_token = authapp_access_token
     auth0 = auth.Auth0(
         domain=AUTH0_TESTING_DOMAIN,
